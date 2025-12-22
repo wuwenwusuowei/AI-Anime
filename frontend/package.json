@@ -1,0 +1,17 @@
+{
+  "name": "edumatch-frontend",
+  "version": "1.0.0",
+  "description": "EduMatch 漫改视频生成器前端",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'Static build - ready for deployment'",
+    "preview": "npx serve . -p 8080"
+  },
+  "keywords": ["vue", "animation", "ai"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}

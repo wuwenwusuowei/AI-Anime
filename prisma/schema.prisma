@@ -1,0 +1,95 @@
+// Prisma schema for AI Video Generation Project
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  videos    Video[]
+  videoTasks VideoTask[]
+  
+  @@map("users")
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  prompt      String
+  videoUrl    String?
+  thumbnailUrl String?
+  status      VideoStatus @default(PENDING)
+  duration    Int?
+  resolution  String?
+  fileSize    Int?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("videos")
+}
+
+model VideoTask {
+  id               Int      @id @default(autoincrement())
+  
+  // 提示词相关
+  userPrompt       String   @db.Text
+  style            String
+  translatedPrompt String?  @db.Text
+  
+  // 任务状态
+  status           String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  
+  // 关联 ComfyUI 的 ID
+  promptId         String?  @unique // 任务ID必须唯一
+  
+  // 结果
+  videoUrl         String?  @db.VarChar(512)
+  
+  // 关联用户 (可选，如果暂不做登录，这两行可以删掉)
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id])
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@map("video_tasks")
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  prompt      String
+  category    String
+  tags        String
+  isPublic    Boolean @default(true)
+  usageCount  Int @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("templates")
+}
+
+enum VideoStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+

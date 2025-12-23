@@ -82,6 +82,12 @@ prisma/migrations/
 uploads/
 temp/
 
+# Generated videos (忽略生成的视频文件夹)
+public/videos/*
+
+# Keep .gitkeep in videos folder (保留 .gitkeep 文件)
+!public/videos/.gitkeep
+
 # OS generated files
 .DS_Store
 .DS_Store?

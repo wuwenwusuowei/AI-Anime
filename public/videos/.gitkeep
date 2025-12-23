@@ -1,0 +1,2 @@
+# This file is used to keep the videos folder in git repository
+# The folder itself is tracked but video files are ignored via .gitignore

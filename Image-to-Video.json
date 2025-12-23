@@ -1,28 +1,32 @@
 {
-  "1": {
+  "24": {
+    "inputs": {
+      "crop": "center",
+      "clip_vision": [
+        "49",
+        0
+      ],
+      "image": [
+        "59",
+        0
+      ]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP视觉编码"
+    }
+  },
+  "26": {
     "inputs": {
       "unet_name": "smoothMixWan22I2VT2V_i2vLow.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
     "_meta": {
-      "title": "1. 加载 I2V 模型 (必须选 i2v 版本!)"
+      "title": "UNet加载器"
     }
   },
-  "2": {
-    "inputs": {
-      "shift": 5.000000000000001,
-      "model": [
-        "1",
-        0
-      ]
-    },
-    "class_type": "ModelSamplingSD3",
-    "_meta": {
-      "title": "模型 Shift 修正"
-    }
-  },
-  "3": {
+  "27": {
     "inputs": {
       "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
       "type": "wan",
@@ -30,183 +34,141 @@
     },
     "class_type": "CLIPLoader",
     "_meta": {
-      "title": "2. 加载文本编码器 (UMT5)"
+      "title": "加载CLIP"
     }
   },
-  "4": {
+  "28": {
     "inputs": {
       "vae_name": "wan_2.1_vae.safetensors"
     },
     "class_type": "VAELoader",
     "_meta": {
-      "title": "3. 加载 VAE"
+      "title": "加载VAE"
     }
   },
-  "5": {
+  "29": {
     "inputs": {
-      "clip_name": "sigclip_vision_patch14_384.safetensors"
-    },
-    "class_type": "CLIPVisionLoader",
-    "_meta": {
-      "title": "4. 加载视觉模型 (SigLIP)"
-    }
-  },
-  "6": {
-    "inputs": {
-      "image": "R.jpg"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "★ 上传你的漫画图片 ★"
-    }
-  },
-  "7": {
-    "inputs": {
-      "width": 1280,
-      "height": 720,
-      "upscale_method": "nearest-exact",
-      "keep_proportion": "crop",
-      "pad_color": "0, 0, 0",
-      "crop_position": "center",
-      "divisible_by": 0,
-      "device": "cpu",
-      "image": [
-        "6",
-        0
-      ]
-    },
-    "class_type": "ImageResizeKJv2",
-    "_meta": {
-      "title": "自动缩放 (已修复: crop)"
-    }
-  },
-  "8": {
-    "inputs": {
-      "crop": "center",
-      "clip_vision": [
-        "5",
-        0
-      ],
-      "image": [
-        "7",
-        0
-      ]
-    },
-    "class_type": "CLIPVisionEncode",
-    "_meta": {
-      "title": "图像视觉编码"
-    }
-  },
-  "9": {
-    "inputs": {
-      "text": "(continuously waving hand back and forth, infinite loop, shaking hand, constant motion:1.3), (upper body swaying:1.2), subtle breathing, 1boy, Monkey D. Luffy, straw hat, red vest, open shirt, scar under eye, black hair, big smile, grinning, white teeth, hand up, open palm, anime style, 2D, flat color, cel shading, high quality, motion, smooth movement",
-      "clip": [
-        "3",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "正向提示词"
-    }
-  },
-  "10": {
-    "inputs": {
-      "text": "low quality, worst quality, blurry, distorted, 3d, realistic，morphing, changing face, distorted face, changing clothes, disappearing",
-      "clip": [
-        "3",
-        0
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "负向提示词"
-    }
-  },
-  "11": {
-    "inputs": {
-      "width": 832,
-      "height": 480,
-      "length": 17,
-      "batch_size": 1,
-      "motion_amplitude": 1.3,
-      "positive": [
-        "9",
-        0
-      ],
-      "negative": [
-        "10",
-        0
-      ],
-      "vae": [
-        "4",
-        0
-      ],
-      "clip_vision_output": [
-        "8",
-        0
-      ],
-      "start_image": [
-        "7",
-        0
-      ]
-    },
-    "class_type": "PainterI2V",
-    "_meta": {
-      "title": "Painter I2V (核心处理)"
-    }
-  },
-  "12": {
-    "inputs": {
-      "seed": 623207434910680,
-      "steps": 25,
-      "cfg": 6,
-      "sampler_name": "uni_pc",
-      "scheduler": "simple",
-      "denoise": 1,
+      "shift": 8.000000000000002,
       "model": [
-        "2",
+        "26",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "采样算法（SD3）"
+    }
+  },
+  "30": {
+    "inputs": {
+      "text": "A young Japanese schoolgirl with long black hair, wearing a white sailor uniform with a red neckerchief and a black pleated skirt, is sitting on the ground covered with pink cherry blossom petals. She holds a red disposable cup in her hands—her lips are slightly parted as if she’s mid-sentence, and there’s a soft, thoughtful glint in her brown eyes. Her hair flutters gently in the breeze, and a faint, subtle smile tugs at the corner of her mouth. The background, which includes a large cherry blossom tree and school buildings under a clear blue sky, is static and does not move. anime style, 2D, flat color, cel shading, high quality, masterpiece, 4k, vivid colors",
+      "clip": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "31": {
+    "inputs": {
+      "text": "Vivid tones, overexposed, static, unclear details, subtitles, style, artwork, painting, still image, overall gray, worst quality, low quality, JPEG compression artifacts, ugly, defective, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, misshapen limbs, fused fingers, motionless image, cluttered background, three legs, many people in the background,",
+      "clip": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "32": {
+    "inputs": {
+      "shift": 8.000000000000002,
+      "model": [
+        "60",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "采样算法（SD3）"
+    }
+  },
+  "38": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 821037727864739,
+      "steps": 6,
+      "cfg": 1,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "beta",
+      "start_at_step": 0,
+      "end_at_step": 3,
+      "return_with_leftover_noise": "enable",
+      "model": [
+        "32",
         0
       ],
       "positive": [
-        "11",
+        "56",
         0
       ],
       "negative": [
-        "11",
+        "56",
         1
       ],
       "latent_image": [
-        "11",
+        "56",
         2
       ]
     },
-    "class_type": "KSampler",
+    "class_type": "KSamplerAdvanced",
     "_meta": {
-      "title": "采样器"
+      "title": "K采样器（高级）"
     }
   },
-  "13": {
+  "39": {
     "inputs": {
-      "samples": [
-        "12",
+      "add_noise": "disable",
+      "noise_seed": 786265638004426,
+      "steps": 6,
+      "cfg": 1,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "beta",
+      "start_at_step": 3,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "29",
         0
       ],
-      "vae": [
-        "4",
+      "positive": [
+        "56",
+        0
+      ],
+      "negative": [
+        "56",
+        1
+      ],
+      "latent_image": [
+        "38",
         0
       ]
     },
-    "class_type": "VAEDecode",
+    "class_type": "KSamplerAdvanced",
     "_meta": {
-      "title": "VAE 解码"
+      "title": "K采样器（高级）"
     }
   },
-  "14": {
+  "40": {
     "inputs": {
-      "frame_rate": 8,
+      "frame_rate": 16,
       "loop_count": 0,
-      "filename_prefix": "WanI2V_Comic",
+      "filename_prefix": "Animate",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -215,61 +177,109 @@
       "pingpong": false,
       "save_output": true,
       "images": [
-        "35",
+        "46",
         0
       ]
     },
     "class_type": "VHS_VideoCombine",
     "_meta": {
-      "title": "保存视频 (MP4)"
+      "title": "Video Combine 🎥🅥🅗🅢"
     }
   },
-  "31": {
+  "43": {
     "inputs": {
-      "start": 0,
-      "length": -1
+      "image": "cea3cf59fc8584b7bc736c315deb77da2ba7cf1ed0b0e3e55d33cc09a14280a4.webp"
     },
-    "class_type": "ImageFromBatch+",
+    "class_type": "LoadImage",
     "_meta": {
-      "title": "🔧 Image From Batch"
+      "title": "加载图像"
     }
   },
-  "34": {
+  "46": {
     "inputs": {
-      "split_index": 1,
-      "images": [
-        "13",
-        0
-      ]
-    },
-    "class_type": "VHS_SplitImages",
-    "_meta": {
-      "title": "Split Images 🎥🅥🅗🅢"
-    }
-  },
-  "35": {
-    "inputs": {
-      "upscale_model": [
-        "37",
+      "samples": [
+        "39",
         0
       ],
-      "image": [
-        "34",
-        2
+      "vae": [
+        "28",
+        0
       ]
     },
-    "class_type": "ImageUpscaleWithModel",
+    "class_type": "VAEDecode",
     "_meta": {
-      "title": "使用模型放大图像"
+      "title": "VAE解码"
     }
   },
-  "37": {
+  "49": {
     "inputs": {
-      "model_name": "4x-UltraSharp.pth"
+      "clip_name": "sigclip_vision_patch14_384.safetensors"
     },
-    "class_type": "UpscaleModelLoader",
+    "class_type": "CLIPVisionLoader",
     "_meta": {
-      "title": "加载放大模型"
+      "title": "加载CLIP视觉"
+    }
+  },
+  "56": {
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "length": 81,
+      "batch_size": 1,
+      "motion_amplitude": 1.3000000000000003,
+      "positive": [
+        "30",
+        0
+      ],
+      "negative": [
+        "31",
+        0
+      ],
+      "vae": [
+        "28",
+        0
+      ],
+      "clip_vision_output": [
+        "24",
+        0
+      ],
+      "start_image": [
+        "59",
+        0
+      ]
+    },
+    "class_type": "PainterI2V",
+    "_meta": {
+      "title": "PainterI2V"
+    }
+  },
+  "59": {
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "crop",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "60": {
+    "inputs": {
+      "unet_name": "smoothMixWan22I2VT2V_i2vHigh-Q4_K_M.gguf"
+    },
+    "class_type": "UnetLoaderGGUF",
+    "_meta": {
+      "title": "Unet Loader (GGUF)"
     }
   }
 }

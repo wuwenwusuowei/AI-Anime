@@ -3,20 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎨 EduMatch 漫改视频生成器</title>
-    <meta http-equiv="Content-Security-Policy" content="
-        script-src 'self' 'unsafe-inline' https://unpkg.com; 
-        style-src 'self' 'unsafe-inline'; 
-        img-src 'self' data: blob:; 
-        media-src 'self' blob:; 
-        connect-src 'self' http://localhost:3000 ws://localhost:3000 ws: wss:; 
-        font-src 'self';
-        object-src 'none';
-        base-uri 'self';
-        form-action 'self';
-        frame-ancestors 'self';
-    ">
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js" crossorigin="anonymous"></script>
+    <title>🎨 EduMatch 漫改视频生成器 - 测试版</title>
+    <script src="./vue.global.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -70,24 +58,7 @@
             overflow: hidden;
         }
         
-        .debug-info {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            max-width: 300px;
-            z-index: 1000;
-        }
-        
-        .debug-info pre {
-            margin: 5px 0 0 0;
-            white-space: pre-wrap;
-            font-size: 11px;
-        }
+
     </style>
 </head>
 <body>
@@ -133,14 +104,30 @@
                                     rows="3"
                                 ></textarea>
                                 
-                                <div class="controls">
-                                    <select v-model="style">
-                                        <option value="anime">日式动漫</option>
-                                        <option value="cyberpunk">赛博朋克</option>
-                                        <option value="ink">水墨国风</option>
-                                    </select>
+                                <div class="settings-row">
+                                    <!-- 时长选择 -->
+                                    <div class="setting-item">
+                                        <label>⏱️ 视频时长:</label>
+                                        <select v-model="duration">
+                                            <option value="2">2 秒 (33帧)</option>
+                                            <option value="3">3 秒 (49帧)</option>
+                                            <option value="4">4 秒 (65帧)</option>
+                                            <option value="5">5 秒 (81帧)</option>
+                                        </select>
+                                    </div>
                                     
-                                    <button @click="handleGenerate" :disabled="loading || !selectedFile">
+                                    <!-- 画质选择 -->
+                                    <div class="setting-item">
+                                        <label>📺 画质清晰度:</label>
+                                        <select v-model="resolution">
+                                            <option value="576p">标准 (1024x576) - 🚀 快</option>
+                                            <option value="720p">高清 (1280x720) - 🐢 慢</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="controls">
+                                    <button @click="handleGenerate" :disabled="loading || !selectedFile" style="width: 100%">
                                         {{ loading ? '正在施法中...' : '让图动起来 ✨' }}
                                     </button>
                                 </div>
@@ -179,16 +166,13 @@
                                 <small style="display: block; margin-top: 5px; opacity: 0.7;">点击此消息可清除</small>
                             </div>
                             
-                            <!-- 开发环境调试信息 -->
-                            <div v-if="debugMode" class="debug-info">
-                                <h4>🐛 调试信息</h4>
-                                <pre>{{ debugInfo }}</pre>
-                            </div>
+
                         </div>
                     `,
                     setup() {
                         const prompt = ref('')
-                        const style = ref('anime')
+                        const duration = ref('3')      // 默认 3秒
+                        const resolution = ref('576p') // 默认标准
                         const loading = ref(false)
                         const taskId = ref(null)
                         const status = ref('')
@@ -197,8 +181,6 @@
                         const selectedFile = ref(null)
                         const previewUrl = ref('')
                         const fileInput = ref(null)
-                        const debugMode = ref(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                        const debugInfo = ref({})
                         
                         // 计算状态文本
                         const statusText = computed(() => {
@@ -210,19 +192,6 @@
                             }
                             return statusMap[status.value] || status.value
                         })
-                        
-                        // 更新调试信息
-                        const updateDebugInfo = () => {
-                            debugInfo.value = {
-                                taskId: taskId.value,
-                                status: status.value,
-                                videoUrl: videoUrl.value ? '已设置' : '未设置',
-                                error: error.value || '无错误',
-                                loading: loading.value,
-                                selectedFile: selectedFile.value ? selectedFile.value.name : '未选择',
-                                timestamp: new Date().toLocaleString()
-                            }
-                        }
                         
                         // 触发文件选择
                         const triggerUpload = () => {
@@ -254,7 +223,6 @@
                                     selectedFile.value = file
                                     previewUrl.value = URL.createObjectURL(file)
                                     error.value = '' // 清除之前的错误
-                                    updateDebugInfo()
                                 }
                             } catch (err) {
                                 console.error('文件处理失败:', err)
@@ -277,13 +245,11 @@
                         // 处理视频加载成功
                         const handleVideoLoaded = () => {
                             console.log('视频加载成功')
-                            updateDebugInfo()
                         }
                         
                         // 清除错误
                         const clearError = () => {
                             error.value = ''
-                            updateDebugInfo()
                         }
                         
                         // 点击生成
@@ -297,13 +263,13 @@
                             error.value = ''
                             videoUrl.value = ''
                             status.value = '提交中...'
-                            updateDebugInfo()
                             
                             try {
                                 const formData = new FormData()
                                 formData.append('image', selectedFile.value)
                                 formData.append('prompt', prompt.value || '自动生成动画效果')
-                                formData.append('style', style.value)
+                                formData.append('duration', duration.value)     // 传秒数 (例如 "3")
+                                formData.append('resolution', resolution.value) // 传档位 (例如 "576p")
                                 
                                 // 添加超时控制
                                 const controller = new AbortController()
@@ -318,7 +284,7 @@
                                 clearTimeout(timeoutId)
                                 
                                 if (!res.ok) {
-                                    throw new Error(\`HTTP \${res.status}: \${res.statusText}\`)
+                                    throw new Error(`HTTP ${res.status}: ${res.statusText}`)
                                 }
                                 
                                 const data = await res.json()
@@ -327,11 +293,9 @@
                                     taskId.value = data.taskId
                                     status.value = 'PENDING'
                                     pollStatus(data.taskId)
-                                    updateDebugInfo()
                                 } else {
                                     error.value = '提交失败: ' + (data.error || '未知错误')
                                     loading.value = false
-                                    updateDebugInfo()
                                 }
                             } catch (err) {
                                 if (err.name === 'AbortError') {
@@ -340,7 +304,6 @@
                                     error.value = '网络错误: ' + err.message
                                 }
                                 loading.value = false
-                                updateDebugInfo()
                             }
                         }
                         
@@ -359,7 +322,7 @@
                                         return
                                     }
                                     
-                                    const res = await fetch(\`http://localhost:3000/api/status/\${id}\`, {
+                                    const res = await fetch(`http://localhost:3000/api/status/${id}`, {
                                         method: 'GET',
                                         headers: {
                                             'Cache-Control': 'no-cache'
@@ -367,25 +330,22 @@
                                     })
                                     
                                     if (!res.ok) {
-                                        throw new Error(\`HTTP \${res.status}: \${res.statusText}\`)
+                                        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
                                     }
                                     
                                     const data = await res.json()
                                     status.value = data.status
-                                    updateDebugInfo()
                                     
                                     if (data.status === 'COMPLETED') {
                                         videoUrl.value = data.videoUrl
                                         loading.value = false
                                         clearInterval(interval)
-                                        updateDebugInfo()
                                     }
                                     
                                     if (data.status === 'FAILED') {
                                         error.value = '生成失败: ' + (data.error || '请检查后端日志')
                                         loading.value = false
                                         clearInterval(interval)
-                                        updateDebugInfo()
                                     }
                                     
                                 } catch (err) {
@@ -397,12 +357,10 @@
                             }, 3000)
                         }
                         
-                        // 初始化
-                        updateDebugInfo()
-                        
                         return {
                             prompt,
-                            style,
+                            duration,
+                            resolution,
                             loading,
                             taskId,
                             status,
@@ -411,8 +369,6 @@
                             selectedFile,
                             previewUrl,
                             fileInput,
-                            debugMode,
-                            debugInfo,
                             statusText,
                             triggerUpload,
                             handleFileChange,
@@ -454,7 +410,7 @@
                 
             } catch (err) {
                 console.error('应用启动失败:', err)
-                document.getElementById('app').innerHTML = \`
+                document.getElementById('app').innerHTML = `
                     <div style="
                         background: #fee; 
                         padding: 20px; 
@@ -464,7 +420,7 @@
                         color: #c00;
                     ">
                         <h2>❌ 应用启动失败</h2>
-                        <p>错误信息: \${err.message}</p>
+                        <p>错误信息: ${err.message}</p>
                         <p>请刷新页面重试，或检查浏览器控制台</p>
                         <button onclick="location.reload()" style="
                             background: #007bff; 
@@ -475,7 +431,7 @@
                             cursor: pointer;
                         ">刷新页面</button>
                     </div>
-                \`
+                `
             }
         })
     </script>
@@ -575,6 +531,35 @@
             display: flex; 
             gap: 15px; 
             margin-bottom: 20px;
+        }
+        
+        .settings-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .setting-item label {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .setting-item select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
         }
         
         button { 

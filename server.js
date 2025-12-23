@@ -7,35 +7,56 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import FormData from 'form-data';
-import fetch from 'node-fetch'; // 如果Node版本较低可能需要这个，Node 18+自带fetch可忽略
+import fetch from 'node-fetch';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
 import 'dotenv/config';
 
-// --- 1. 基础配置 ---
+const streamPipeline = promisify(pipeline);
+
+// --- 1. 配置常量 ---
+
+// 画质配置 (16:9)
+const RESOLUTION_CONFIG = {
+    "576p": { width: 1024, height: 576 },
+    "720p": { width: 1280, height: 720 }
+};
+
+// 时长配置 (基于 16fps，公式: 秒数 * 16 + 1)
+// 显存预警：720p下超过 3秒(49帧) 容易爆显存，请注意
+const DURATION_MAP = {
+    "1": 17,
+    "2": 33,
+    "3": 49,
+    "4": 65,
+    "5": 81
+};
+
+// --- 2. 基础配置 ---
 const app = express();
 const prisma = new PrismaClient();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 配置中间件
 app.use(cors());
 app.use(express.json());
 
-// 配置 Multer (文件上传临时目录)
+// 🟢 [新增] 配置静态目录，让前端能访问本地视频文件
+app.use(express.static('public'));
+
 const upload = multer({ dest: 'uploads/' });
 
-// 配置智谱 AI
 const zhipu = new OpenAI({
     apiKey: process.env.ZHIPU_API_KEY, 
     baseURL: "https://open.bigmodel.cn/api/paas/v4/" 
 });
 
-// --- 2. 核心工具函数 ---
+// --- 2. 核心 AI 逻辑 (重写版) ---
 
 /**
- * 功能：利用智谱 GLM-4V (视觉模型) 分析图片特征
- * 作用：解决"人物一致性"问题，让AI看懂原图长什么样
+ * 视觉分析：现在要求 AI 生成一段"静态画面描述"，而不是零散的标签
  */
 async function analyzeImageFeatures(filePath) {
-    console.log("👀 [AI视觉] 正在全方位分析图片 (人物 + 背景)...");
+    console.log("👀 [AI视觉] 正在深度解析画面...");
     
     try {
         const fileBuffer = fs.readFileSync(filePath);
@@ -43,14 +64,15 @@ async function analyzeImageFeatures(filePath) {
         const dataUrl = `data:image/jpeg;base64,${base64Image}`;
 
         const response = await zhipu.chat.completions.create({
-            model: "glm-4v-flash", // 免费且快速的视觉模型
+            model: "glm-4v-flash",
             messages: [
                 {
                     role: "user",
                     content: [
                         { 
                             type: "text", 
-                            text: "请分析这张图片，提取以下三个维度的英文特征 Tags：\n1. 人物外观（发色、服饰）。\n2. 人物当前姿势（站立、坐着、侧身）。\n3. 背景环境细节（树木、建筑、天空颜色、室内/室外）。\n\n请直接输出英文单词，用逗号分隔，不要分类，不要输出任何解释。" 
+                            // 🌟 核心修改：要求生成通顺的英文段落
+                            text: "请用一段通顺、客观、详细的英文描述这张图片。重点描述：人物的外貌特征（发色、服饰、五官）、人物当前的姿势、以及背景环境的细节。请使用小说式的描写手法。不要包含任何动作指令（如 running），只描述静态画面。" 
                         },
                         { type: "image_url", image_url: { url: dataUrl } }
                     ]
@@ -58,54 +80,98 @@ async function analyzeImageFeatures(filePath) {
             ]
         });
         
-        const tags = response.choices[0].message.content;
-        console.log("🤖 [AI视觉] 提取结果:", tags);
-        return tags;
+        const description = response.choices[0].message.content;
+        console.log("🤖 [视觉描述]:", description.substring(0, 60) + "...");
+        return description;
     } catch (e) {
-        console.error("❌ 智谱视觉分析失败:", e.message);
-        return "1girl, anime style, standing, outdoor"; // 保底词，防止流程中断
+        console.error("❌ 视觉分析失败:", e.message);
+        return "A character in anime style with detailed background."; // 保底
     }
 }
 
 /**
- * 功能：利用智谱 GLM-4 (语言模型) 组合最终提示词
+ * 提示词生成：升级为"视觉导演"模式，构建电影感和空间感
  */
-async function translatePrompt(userActionText, featureTags, style) {
-    console.log(`📝 [AI翻译] 组合提示词...`);
+async function translatePrompt(userActionText, staticDescription, style) {
+    console.log(`📝 [AI编剧] 正在构建高一致性动态场景...`);
     
-    // 🔴 修改点1：加入 "background consistency" 相关的魔法词
-    let stylePrompt = "anime style, 2D, flat color, high quality, 4k, vivid colors, highly detailed background, consistent background";
+    // 黄金风格后缀 (保持不变)
+    let styleSuffix = "anime style, 2D, flat color, cel shading, high quality, masterpiece, 4k, vivid colors, high contrast";
     
-    const systemPrompt = `你是一个视频生成提示词专家。
-    任务：基于图片特征和用户指令生成提示词。
+    const systemPrompt = `你是一个精通 Wan 2.1 视频模型的"视觉导演"。
+    你的任务是将[静态画面描述]与[用户动作指令]融合，编写一段**具有电影感、空间感**的英文视频脚本。
     
-    输入：
-    1. 图片视觉特征（人物+背景）：${featureTags}
-    2. 用户指令：${userActionText}
+    输入信息：
+    1. 画面基础（视觉特征）：${staticDescription}
+    2. 导演指令（用户动作）：${userActionText}
     
-    规则：
-    1. **必须保留图片中的背景描述**，放在提示词前部。
-    2. **必须保留图片中的姿势描述**（如 standing, sitting），除非用户指令明确要求改变姿势。
-    3. 将用户指令翻译为微小的动态描述（如 subtle breathing, hair floating, slight head movement），避免大幅度动作导致背景崩坏。
-    4. 加上风格词：${stylePrompt}。
-    5. 只输出英文 Tags。`;
+    编写核心原则（逻辑重构）：
+    1. **环境空间构建（关键）**：
+       - 不要只写"背景是静止的"。
+       - **必须详细描述环境的空间关系**。例如："standing under a large cherry blossom tree", "school buildings in the distance", "blue sky above". 
+       - 这样当视频产生镜头运动时，模型能依据这些逻辑自然扩写背景。
+    
+    2. **动作与物理互动**：
+       - 将用户的简单指令（如"挥手"）转化为**连贯的物理动作**。
+       - 必须加入环境互动细节。例如："hair flowing in the wind", "light and shadow changing on face", "cherry petals falling around".
+    
+    3. **运镜与质感**：
+       - 除非用户明确要求静止，否则默认加入微小的运镜描述，如 "slow cinematic camera movement", "slight parallax", "depth of field".
+       - 保持人物特征（Character Consistency）绝对稳定。
+    
+    4. **结构要求**：
+       - [环境与光影] + [人物外貌与姿势] + [动作与互动] + [风格后缀]
+       - 直接输出一段通顺的英文段落。`;
 
     const completion = await zhipu.chat.completions.create({
         model: "glm-4-flash", 
         messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: "开始处理" }
+            { role: "user", content: "开始编写" }
         ],
     });
     return completion.choices[0].message.content;
 }
 
 /**
- * 功能：将图片上传到云端 ComfyUI 服务器
+ * 功能：将云端视频下载到本地硬盘
  */
-async function uploadImageToComfy(localFilePath, originalFilename) {
-    console.log(`📤 [上传] 正在上传图片到 ComfyUI: ${originalFilename}`);
+async function downloadVideoToLocal(cloudUrl, filename) {
+    console.log(`📥 [下载] 正在将视频搬运到本地...`);
     
+    try {
+        // 1. 请求云端文件
+        const response = await fetch(cloudUrl);
+        if (!response.ok) throw new Error(`下载失败: ${response.statusText}`);
+
+        // 2. 确保保存路径存在
+        const saveDir = path.join(__dirname, 'public', 'videos');
+        if (!fs.existsSync(saveDir)) {
+            fs.mkdirSync(saveDir, { recursive: true });
+        }
+
+        // 3. 生成本地文件名 (加个时间戳防止重名)
+        const localFilename = `${Date.now()}_${filename}`;
+        const localFilePath = path.join(saveDir, localFilename);
+
+        // 4. 写入硬盘
+        await streamPipeline(response.body, fs.createWriteStream(localFilePath));
+
+        console.log(`💾 [保存] 视频已保存至: ${localFilePath}`);
+        
+        // 5. 返回本地可访问的 URL (供前端使用)
+        // 注意：这里返回的是指向你本地后端的链接
+        return `http://localhost:${process.env.PORT || 3000}/videos/${localFilename}`;
+    } catch (error) {
+        console.error(`❌ [下载失败] ${error.message}`);
+        throw error;
+    }
+}
+
+// --- 3. ComfyUI 工具函数 ---
+
+async function uploadImageToComfy(localFilePath, originalFilename) {
+    console.log(`📤 [上传] 正在上传: ${originalFilename}`);
     const formData = new FormData();
     formData.append('image', fs.createReadStream(localFilePath));
     formData.append('overwrite', 'true');
@@ -115,57 +181,68 @@ async function uploadImageToComfy(localFilePath, originalFilename) {
             method: 'POST',
             body: formData
         });
-
         if (!response.ok) throw new Error(`Upload Failed: ${response.statusText}`);
-        
         const data = await response.json();
-        console.log(`✅ [上传] 成功，云端文件名: ${data.name}`);
         return data.name; 
     } catch (error) {
-        throw new Error(`连接 ComfyUI 上传接口失败: ${error.message}`);
+        throw new Error(`连接失败: ${error.message}`);
     }
 }
 
-/**
- * 功能：加载 JSON 模板并触发生成任务
- */
-async function triggerComfyUI(positivePrompt, cloudImageName) {
-    // 确保你的 JSON 文件名是这个
-    const workflowPath = path.join(__dirname, 'Image-to-Video.json'); 
-    
-    if (!fs.existsSync(workflowPath)) {
-        throw new Error("找不到工作流模板文件: Image-to-Video.json");
-    }
-
+async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "576p", durationKey = "3") {
+    const workflowPath = path.join(__dirname, 'Image-to-Video.json');
     let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 
-    // --- 🚨 [ID 配置区] 请务必核对你的 JSON ID ---
-    const TEXT_NODE_ID = "9";   // 正向提示词 (CLIPTextEncode)
-    const SEED_NODE_ID = "12";  // 随机种子 (KSampler)
-    const IMAGE_NODE_ID = "6";  // 图片上传 (LoadImage)
-    // ------------------------------------------
+    // --- ID 配置 ---
+    const TEXT_NODE = "30";
+    const IMAGE_NODE = "43";
+    const PAINTER_NODE = "56"; // 核心生成节点 (改分辨率 + 帧数)
+    const RESIZE_NODE = "59";  // 图片缩放节点 (改分辨率)
+    const SAMPLER_IDS = ["38", "39"];
+    // --------------
 
-    // 1. 注入提示词
-    if (workflow[TEXT_NODE_ID]) {
-        workflow[TEXT_NODE_ID].inputs.text = positivePrompt;
-    } else {
-        throw new Error(`找不到提示词节点 ID: ${TEXT_NODE_ID}`);
+    // 1. 计算参数
+    const resConfig = RESOLUTION_CONFIG[resolutionKey] || RESOLUTION_CONFIG["576p"];
+    const targetFrames = DURATION_MAP[durationKey] || 49; // 默认3秒
+
+    console.log(`🔧 [配置] 画质: ${resConfig.width}x${resConfig.height} | 时长: ${durationKey}s (${targetFrames}帧)`);
+
+    // 2. 修改分辨率 (Painter 和 Resize 都要改)
+    if (workflow[PAINTER_NODE]) {
+        workflow[PAINTER_NODE].inputs.width = resConfig.width;
+        workflow[PAINTER_NODE].inputs.height = resConfig.height;
+        workflow[PAINTER_NODE].inputs.length = targetFrames; // <--- 修改总帧数
     }
-    
-    // 2. 注入图片文件名
-    if (workflow[IMAGE_NODE_ID]) {
-        workflow[IMAGE_NODE_ID].inputs.image = cloudImageName;
-    } else {
-        throw new Error(`找不到图片加载节点 ID: ${IMAGE_NODE_ID}`);
+    if (workflow[RESIZE_NODE]) {
+        workflow[RESIZE_NODE].inputs.width = resConfig.width;
+        workflow[RESIZE_NODE].inputs.height = resConfig.height;
     }
 
-    // 3. 注入随机种子
+    // 3. 注入提示词、图片、种子 (保持原逻辑)
+    if (workflow[TEXT_NODE]) {
+        workflow[TEXT_NODE].inputs.text = positivePrompt;
+    } else {
+        throw new Error(`找不到提示词节点 ID: ${TEXT_NODE}`);
+    }
+
+    if (workflow[IMAGE_NODE]) {
+        workflow[IMAGE_NODE].inputs.image = cloudImageName;
+    } else {
+        throw new Error(`找不到图片节点 ID: ${IMAGE_NODE}`);
+    }
+
+    // 注入随机种子 (同时给两个采样器赋值)
     const randomSeed = Math.floor(Math.random() * 1000000000000);
-    if (workflow[SEED_NODE_ID]) {
-        workflow[SEED_NODE_ID].inputs.seed = randomSeed;
-    }
+    
+    SAMPLER_IDS.forEach(id => {
+        if (workflow[id]) {
+            workflow[id].inputs.noise_seed = randomSeed;
+        } else {
+            console.warn(`⚠️ 警告: 找不到采样器节点 ID ${id}`);
+        }
+    });
 
-    console.log(`🚀 [触发] 发送任务给 ComfyUI... 种子: ${randomSeed}`);
+    console.log(`🚀 [触发] 发送任务... 种子: ${randomSeed}`);
     
     const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
         method: 'POST',
@@ -174,181 +251,143 @@ async function triggerComfyUI(positivePrompt, cloudImageName) {
     });
 
     if (!response.ok) throw new Error(`ComfyUI Error: ${response.statusText}`);
-    
     const data = await response.json();
     return data.prompt_id;
 }
 
-// --- 3. API 路由接口 ---
+// --- 4. API 路由 ---
 
-// POST: 创建生成任务
 app.post('/api/generate', upload.single('image'), async (req, res) => {
     try {
-        const { prompt, style } = req.body;
+        // 从 body 获取参数
+        const { prompt, resolution, duration } = req.body;
         const file = req.file;
+        if (!file) return res.status(400).json({ error: "请上传图片" });
 
-        if (!file) return res.status(400).json({ error: "请上传一张图片！" });
+        console.log(`\n🆕 收到新任务: ${prompt}, 画质: ${resolution}, 时长: ${duration}s, 图片: ${file.originalname}`);
 
-        console.log(`\n🆕 收到新任务: ${prompt || "默认动作"}, 图片: ${file.originalname}`);
-
-        // 1. 数据库建档
         const task = await prisma.videoTask.create({
-            data: { 
-                userPrompt: prompt || "动态视频", 
-                style: style || 'anime', 
-                status: 'PENDING' 
-            }
+            data: { userPrompt: prompt || "动态视频", style: 'anime', status: 'PENDING' }
         });
 
-        // 2. 异步处理流水线 (不阻塞前端响应)
+        res.json({ success: true, taskId: task.id });
+
         (async () => {
             try {
-                // A. 上传图片到 ComfyUI
+                // A. 上传图片
                 const cloudFileName = await uploadImageToComfy(file.path, file.originalname);
                 
-                // B. 智谱看图提取特征
-                const charFeatures = await analyzeImageFeatures(file.path);
+                // B. 视觉分析 (生成静态描述)
+                const staticDesc = await analyzeImageFeatures(file.path);
                 
-                // C. 组合最终提示词
-                const finalPrompt = await translatePrompt(prompt || "moving, high quality", charFeatures, style);
+                // C. 提示词融合 (静态 + 动作 + 风格)
+                const finalPrompt = await translatePrompt(prompt || "natural movement", staticDesc, 'anime');
                 
-                // 更新数据库记录翻译结果
-                await prisma.videoTask.update({ 
-                    where: { id: task.id }, 
-                    data: { translatedPrompt: finalPrompt } 
-                });
+                await prisma.videoTask.update({ where: { id: task.id }, data: { translatedPrompt: finalPrompt } });
 
-                // D. 触发 ComfyUI
-                const promptId = await triggerComfyUI(finalPrompt, cloudFileName);
+                // D. 触发任务
+                const promptId = await triggerComfyUI(finalPrompt, cloudFileName, resolution, duration);
                 
-                // E. 更新状态为进行中
-                await prisma.videoTask.update({
-                    where: { id: task.id }, 
-                    data: { status: 'PROCESSING', promptId: promptId }
-                });
-
-                console.log(`✅ 任务 ${task.id} 处理中, PromptID: ${promptId}`);
+                await prisma.videoTask.update({ where: { id: task.id }, data: { status: 'PROCESSING', promptId: promptId } });
 
             } catch (err) {
-                console.error("❌ 后台任务执行失败:", err);
-                await prisma.videoTask.update({ 
-                    where: { id: task.id }, 
-                    data: { status: 'FAILED' } 
-                });
+                console.error("❌ 任务失败:", err);
+                await prisma.videoTask.update({ where: { id: task.id }, data: { status: 'FAILED' } });
             } finally {
-                // 清理本地上传的临时图片
                 if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
             }
         })();
-
-        // 立即返回任务ID
-        res.json({ success: true, taskId: task.id });
-
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
-// GET: 查询任务状态 (包含 MP4/GIF 解析 + 子目录修复)
+// 查询接口 (保持之前的 MP4/Subfolder 解析逻辑)
 app.get('/api/status/:id', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
         const task = await prisma.videoTask.findUnique({ where: { id: taskId } });
-        
         if (!task) return res.status(404).json({ error: "任务不存在" });
+        if (task.status === 'COMPLETED') return res.json({ status: 'COMPLETED', videoUrl: task.videoUrl });
 
-        // 如果已完成，直接返回结果
-        if (task.status === 'COMPLETED') {
-            return res.json({ status: 'COMPLETED', videoUrl: task.videoUrl });
-        }
-
-        // 如果是处理中，去 ComfyUI 查历史
         if (task.status === 'PROCESSING' && task.promptId) {
             try {
                 const historyRes = await fetch(`${process.env.COMFY_API_URL}/history/${task.promptId}`);
                 const historyData = await historyRes.json();
                 
-                // 如果历史数据里有这个 ID，说明跑完了
                 if (historyData[task.promptId]) {
-                    console.log("🏁 ComfyUI 任务结束，正在解析输出文件...");
+                    console.log("🏁 任务完成，正在解析...");
                     const outputs = historyData[task.promptId].outputs;
                     
                     let filename = null;
                     let subfolder = "";
                     let type = "output";
 
-                    // 遍历所有输出节点寻找视频文件
                     for (const nodeId in outputs) {
                         const nodeOutput = outputs[nodeId];
-
-                        // 1. 优先找 videos (MP4)
+                        // 优先找 MP4
                         if (nodeOutput.videos && nodeOutput.videos.length > 0) {
-                            const fileData = nodeOutput.videos[0];
-                            filename = fileData.filename;
-                            subfolder = fileData.subfolder;
-                            type = fileData.type;
-                            console.log(`👉 找到 MP4: ${filename} (目录: ${subfolder})`);
+                            filename = nodeOutput.videos[0].filename;
+                            subfolder = nodeOutput.videos[0].subfolder;
+                            type = nodeOutput.videos[0].type;
                             break;
                         }
-
-                        // 2. 其次找 gifs (兼容旧配置)
+                        // 兼容 GIF
                         if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
-                            const fileData = nodeOutput.gifs[0];
-                            filename = fileData.filename;
-                            subfolder = fileData.subfolder;
-                            type = fileData.type;
-                            console.log(`👉 找到 GIF: ${filename} (目录: ${subfolder})`);
+                            filename = nodeOutput.gifs[0].filename;
+                            subfolder = nodeOutput.gifs[0].subfolder;
+                            type = nodeOutput.gifs[0].type;
                             break;
                         }
                     }
 
                     if (filename) {
-                        // --- URL 拼接逻辑 (修复子目录和双斜杠问题) ---
-                        
-                        // 1. 去掉 .env 里 URL 可能多余的末尾斜杠
                         const baseUrl = process.env.COMFY_API_URL.replace(/\/$/, "");
-                        
-                        // 2. 构造查询参数
                         const params = new URLSearchParams();
                         params.append("filename", filename);
                         params.append("type", type);
                         if (subfolder) params.append("subfolder", subfolder);
 
-                        // 3. 生成最终链接
-                        const fullVideoUrl = `${baseUrl}/view?${params.toString()}`;
+                        // 这是云端的临时链接 (稍后会失效)
+                        const cloudUrl = `${baseUrl}/view?${params.toString()}`;
+                        console.log("☁️ 云端临时地址:", cloudUrl);
 
-                        console.log("🔗 视频最终地址:", fullVideoUrl);
+                        // 🟢 [新增核心逻辑] 下载到本地！
+                        let finalUrl = cloudUrl; // 默认先用云端的
+                        try {
+                            // 调用下载函数，把云端链接变成本地链接
+                            finalUrl = await downloadVideoToLocal(cloudUrl, filename);
+                        } catch (downloadErr) {
+                            console.error("⚠️ 下载到本地失败，将使用云端链接:", downloadErr.message);
+                        }
 
-                        // 更新数据库
+                        // 更新数据库 (存的是永久有效的本地链接)
                         await prisma.videoTask.update({
                             where: { id: task.id },
-                            data: { status: 'COMPLETED', videoUrl: fullVideoUrl }
+                            data: { status: 'COMPLETED', videoUrl: finalUrl }
                         });
                         
-                        return res.json({ status: 'COMPLETED', videoUrl: fullVideoUrl });
-                    } else {
-                        console.warn("⚠️ 任务显示完成，但未找到视频输出文件");
+                        return res.json({ status: 'COMPLETED', videoUrl: finalUrl });
                     }
                 }
             } catch (e) {
-                console.error("查询 ComfyUI 历史出错:", e.message);
+                // 忽略网络抖动
             }
         }
-        
-        // 还没完成，返回当前状态
         res.json({ status: task.status, videoUrl: task.videoUrl });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: error.message });
+    } catch (e) {
+        res.status(500).json({error: e.message});
     }
 });
 
-// --- 4. 启动服务 ---
+// 确保视频保存目录存在
+const videosDir = path.join(__dirname, 'public', 'videos');
+if (!fs.existsSync(videosDir)) {
+    fs.mkdirSync(videosDir, { recursive: true });
+    console.log(`📁 创建视频目录: ${videosDir}`);
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 EduMatch 后端服务已启动`);
-    console.log(`📡 本地地址: http://localhost:${PORT}`);
-    console.log(`🔗 远程 ComfyUI: ${process.env.COMFY_API_URL}`);
+    console.log(`🚀 服务已启动: http://localhost:${PORT}`);
 });

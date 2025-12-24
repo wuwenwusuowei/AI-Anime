@@ -1,6 +1,5 @@
 <template>
-  <BasicLayout>
-    <div class="dashboard">
+  <div class="dashboard">
       <!-- 统计卡片 -->
       <div class="stats-grid">
         <el-card class="stat-card" shadow="hover">
@@ -211,15 +210,13 @@
         </el-empty>
       </el-card>
     </div>
-  </BasicLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGenerationStore } from '@/stores/generation'
-import { formatDate } from '@/utils/format'
-import BasicLayout from '@/layout/BasicLayout.vue'
+import { ElMessage } from 'element-plus'
 import {
   VideoPlay,
   TrendCharts,

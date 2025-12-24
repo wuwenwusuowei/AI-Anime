@@ -16,7 +16,7 @@
             <span>免费使用基础功能</span>
           </div>
           <div class="benefit-item">
-            <el-icon><Lightning /></el-icon>
+            <el-icon><Connection /></el-icon>
             <span>高速视频生成体验</span>
           </div>
           <div class="benefit-item">
@@ -136,7 +136,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import type { FormInstance, FormRules } from 'element-plus'
 import { 
-  VideoPlay, Star, Lightning, Folder, Tools, Service,
+  VideoPlay, Star, Connection, Folder, Tools, Service,
   User, Message, Lock 
 } from '@element-plus/icons-vue'
 

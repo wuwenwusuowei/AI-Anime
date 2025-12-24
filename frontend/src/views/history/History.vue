@@ -1,21 +1,18 @@
 <template>
-  <BasicLayout>
-    <div class="history-container">
-      <el-card>
-        <div class="coming-soon">
-          <el-icon size="64"><Clock /></el-icon>
-          <h2>历史记录</h2>
-          <p>历史记录功能正在开发中...</p>
-          <el-button type="primary" @click="$router.push('/dashboard')">返回控制台</el-button>
-        </div>
-      </el-card>
-    </div>
-  </BasicLayout>
+  <div class="history-container">
+    <el-card>
+      <div class="coming-soon">
+        <el-icon size="64"><Clock /></el-icon>
+        <h2>历史记录</h2>
+        <p>历史记录功能正在开发中...</p>
+        <el-button type="primary" @click="$router.push('/dashboard')">返回控制台</el-button>
+      </div>
+    </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { Clock } from '@element-plus/icons-vue'
-import BasicLayout from '@/layout/BasicLayout.vue'
 </script>
 
 <style lang="scss" scoped>

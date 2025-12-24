@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>控制台 - 漫改视频生成器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --accent-color: #ff6b6b;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7fafc;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 0;
+            box-shadow: var(--shadow);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+            height: 70px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn-logout {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 70px;
+            bottom: 0;
+            width: 260px;
+            background: white;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            margin-bottom: 4px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-secondary);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(102,126,234,0.1) 0%, transparent 100%);
+            border-left-color: var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            margin-top: 70px;
+            padding: 2rem;
+        }
+
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .stat-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .stat-change.positive {
+            background: rgba(72,187,120,0.1);
+            color: #48bb78;
+        }
+
+        .stat-change.negative {
+            background: rgba(245,101,101,0.1);
+            color: #f56565;
+        }
+
+        /* Feature Cards */
+        .features-section {
+            margin-top: 2rem;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .feature-card.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .feature-card.disabled::after {
+            content: '敬请期待';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 28px;
+            color: white;
+        }
+
+        .feature-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .feature-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Recent Works */
+        .recent-works {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-top: 2rem;
+        }
+
+        .works-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .works-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .work-item {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: var(--bg-secondary);
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .work-item:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Text to Video Section */
+        .text-to-video-section {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .form-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-container {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                padding: 0 1rem;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            display: none;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        .toast.success {
+            border-left: 4px solid #48bb78;
+        }
+
+        .toast.error {
+            border-left: 4px solid #f56565;
+        }
+
+        .toast.info {
+            border-left: 4px solid var(--primary-color);
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🎬</div>
+                    <span>漫改视频生成器</span>
+                </div>
+                <div class="user-info">
+                    <div class="user-menu">
+                        <span>欢迎，{{ currentUser?.username || '用户' }}</span>
+                        <div class="user-avatar">{{ getUserInitial() }}</div>
+                        <button class="btn-logout" @click="logout">
+                            <i class="fas fa-sign-out-alt"></i> 退出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav>
+                <a href="#" class="nav-item active" @click="switchPage('dashboard')">
+                    <span class="nav-icon"><i class="fas fa-home"></i></span>
+                    <span>控制台</span>
+                </a>
+                <a href="#" class="nav-item" @click="switchPage('text-to-video')">
+                    <span class="nav-icon"><i class="fas fa-video"></i></span>
+                    <span>文字生成视频</span>
+                </a>
+                <a href="#" class="nav-item" @click="switchPage('image-to-video')">
+                    <span class="nav-icon"><i class="fas fa-image"></i></span>
+                    <span>图片生成视频</span>
+                </a>
+                <a href="#" class="nav-item" @click="switchPage('text-to-image')">
+                    <span class="nav-icon"><i class="fas fa-paint-brush"></i></span>
+                    <span>文字生成图片</span>
+                </a>
+                <a href="#" class="nav-item" @click="switchPage('text-to-speech')">
+                    <span class="nav-icon"><i class="fas fa-microphone"></i></span>
+                    <span>文字转语音</span>
+                </a>
+                <a href="#" class="nav-item" @click="switchPage('history')">
+                    <span class="nav-icon"><i class="fas fa-history"></i></span>
+                    <span>历史记录</span>
+                </a>
+                <a href="#" class="nav-item" @click="switchPage('settings')">
+                    <span class="nav-icon"><i class="fas fa-cog"></i></span>
+                    <span>设置</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <section id="dashboard" class="page-section active">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">控制台概览</h1>
+                
+                <!-- Statistics -->
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value">{{ stats.totalVideos }}</div>
+                                <div class="stat-label">生成视频</div>
+                            </div>
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                                <i class="fas fa-video" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 12% 较上月
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value">{{ stats.totalCredits }}</div>
+                                <div class="stat-label">可用积分</div>
+                            </div>
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                                <i class="fas fa-coins" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> +500 今日
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value">{{ stats.totalTime }}</div>
+                                <div class="stat-label">总时长(分钟)</div>
+                            </div>
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">
+                                <i class="fas fa-clock" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 8% 增长
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value">{{ stats.storageUsed }}GB</div>
+                                <div class="stat-label">存储使用</div>
+                            </div>
+                            <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a, #fee140);">
+                                <i class="fas fa-database" style="color: white;"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change negative">
+                            <i class="fas fa-arrow-down"></i> 2% 减少
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Features Section -->
+                <div class="features-section">
+                    <h2 class="section-title">功能中心</h2>
+                    <div class="features-grid">
+                        <div class="feature-card" @click="switchPage('text-to-video')">
+                            <div class="feature-icon">
+                                <i class="fas fa-pen-fancy"></i>
+                            </div>
+                            <h3 class="feature-title">文字生成视频</h3>
+                            <p class="feature-description">使用先进的AI技术将您的文字描述转换为精美的动漫视频</p>
+                        </div>
+
+                        <div class="feature-card" @click="switchPage('image-to-video')">
+                            <div class="feature-icon">
+                                <i class="fas fa-magic"></i>
+                            </div>
+                            <h3 class="feature-title">图片生成视频</h3>
+                            <p class="feature-description">将静态图片转换为动态视频，让您的创作更加生动</p>
+                        </div>
+
+                        <div class="feature-card disabled">
+                            <div class="feature-icon">
+                                <i class="fas fa-palette"></i>
+                            </div>
+                            <h3 class="feature-title">文字生成图片</h3>
+                            <p class="feature-description">将文字描述转换为高质量的动漫风格图片</p>
+                        </div>
+
+                        <div class="feature-card disabled">
+                            <div class="feature-icon">
+                                <i class="fas fa-microphone-alt"></i>
+                            </div>
+                            <h3 class="feature-title">文字转语音</h3>
+                            <p class="feature-description">使用自然语音合成技术将文字转换为逼真的语音</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Works -->
+                <div class="recent-works">
+                    <div class="works-header">
+                        <h2 class="section-title">最近作品</h2>
+                        <button class="btn-secondary" @click="switchPage('history')">查看全部</button>
+                    </div>
+                    <div class="works-grid" v-if="recentWorks.length > 0">
+                        <div class="work-item" v-for="work in recentWorks" :key="work.id">
+                            <div>
+                                <i class="fas fa-play-circle" style="font-size: 32px;"></i>
+                                <p style="margin-top: 8px; font-size: 12px;">{{ work.title }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="empty-state" v-else>
+                        <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+                        <p>还没有创作记录</p>
+                        <p style="font-size: 14px; margin-top: 8px;">开始您的第一个作品吧！</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Text to Video Page -->
+            <section id="text-to-video" class="page-section">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">文字生成视频</h1>
+                
+                <div class="text-to-video-section">
+                    <div class="form-container">
+                        <div>
+                            <div class="form-group">
+                                <label class="form-label">视频描述 *</label>
+                                <textarea 
+                                    class="form-textarea" 
+                                    v-model="videoForm.prompt"
+                                    placeholder="请详细描述您想要生成的视频内容，例如：一个长发少女在樱花树下跳舞，阳光透过花瓣洒在她的脸上..."
+                                ></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">风格选择</label>
+                                <select class="form-select" v-model="videoForm.style">
+                                    <option value="">默认风格</option>
+                                    <option value="anime">动漫风格</option>
+                                    <option value="realistic">写实风格</option>
+                                    <option value="cartoon">卡通风格</option>
+                                    <option value="fantasy">奇幻风格</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="form-group">
+                                <label class="form-label">视频时长</label>
+                                <select class="form-select" v-model="videoForm.duration">
+                                    <option value="5">5秒</option>
+                                    <option value="10">10秒</option>
+                                    <option value="15">15秒</option>
+                                    <option value="30">30秒</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">分辨率</label>
+                                <select class="form-select" v-model="videoForm.resolution">
+                                    <option value="720">720p</option>
+                                    <option value="1080">1080p</option>
+                                    <option value="4k">4K</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 2rem;">
+                        <button class="btn-primary" @click="generateVideo" :disabled="!videoForm.prompt.trim() || generating">
+                            <span v-if="generating" class="loading"></span>
+                            {{ generating ? '生成中...' : '开始生成' }}
+                        </button>
+                        <button class="btn-secondary" style="margin-left: 1rem;" @click="resetVideoForm">
+                            重置
+                        </button>
+                    </div>
+
+                    <!-- Progress -->
+                    <div class="progress-container" :class="{ active: generating }">
+                        <div class="progress-bar">
+                            <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+                        </div>
+                        <div class="progress-text">{{ progressText }}</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Other Pages (Placeholder) -->
+            <section id="image-to-video" class="page-section">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">图片生成视频</h1>
+                <div class="text-to-video-section">
+                    <p>此功能正在开发中，敬请期待...</p>
+                </div>
+            </section>
+
+            <section id="text-to-image" class="page-section">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">文字生成图片</h1>
+                <div class="text-to-video-section">
+                    <p>此功能正在开发中，敬请期待...</p>
+                </div>
+            </section>
+
+            <section id="text-to-speech" class="page-section">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">文字转语音</h1>
+                <div class="text-to-video-section">
+                    <p>此功能正在开发中，敬请期待...</p>
+                </div>
+            </section>
+
+            <section id="history" class="page-section">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">历史记录</h1>
+                <div class="text-to-video-section">
+                    <p>暂无历史记录</p>
+                </div>
+            </section>
+
+            <section id="settings" class="page-section">
+                <h1 style="margin-bottom: 2rem; font-size: 28px;">设置</h1>
+                <div class="text-to-video-section">
+                    <p>设置页面正在开发中...</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast" :class="toast.type">
+            <i :class="toast.icon"></i>
+            <span>{{ toast.message }}</span>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentUser: null,
+                    currentPage: 'dashboard',
+                    stats: {
+                        totalVideos: 12,
+                        totalCredits: 2500,
+                        totalTime: 45,
+                        storageUsed: 2.3
+                    },
+                    recentWorks: [],
+                    videoForm: {
+                        prompt: '',
+                        style: '',
+                        duration: '10',
+                        resolution: '1080'
+                    },
+                    generating: false,
+                    progress: 0,
+                    progressText: '',
+                    toast: {
+                        show: false,
+                        type: 'info',
+                        message: '',
+                        icon: 'fas fa-info-circle'
+                    }
+                }
+            },
+            methods: {
+                // 页面切换
+                switchPage(pageId) {
+                    this.currentPage = pageId;
+                    
+                    // 更新导航状态
+                    document.querySelectorAll('.nav-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    event.currentTarget.classList.add('active');
+                    
+                    // 更新页面显示
+                    document.querySelectorAll('.page-section').forEach(section => {
+                        section.classList.remove('active');
+                    });
+                    document.getElementById(pageId).classList.add('active');
+                },
+
+                // 退出登录
+                logout() {
+                    if (confirm('确定要退出登录吗？')) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        window.location.href = 'login.html';
+                    }
+                },
+
+                // 获取用户首字母
+                getUserInitial() {
+                    if (this.currentUser?.username) {
+                        return this.currentUser.username.charAt(0).toUpperCase();
+                    }
+                    return 'U';
+                },
+
+                // 生成视频
+                async generateVideo() {
+                    if (!this.videoForm.prompt.trim()) {
+                        this.showToast('请输入视频描述', 'error');
+                        return;
+                    }
+
+                    this.generating = true;
+                    this.progress = 0;
+                    this.progressText = '正在处理您的请求...';
+
+                    try {
+                        // 模拟进度更新
+                        const progressSteps = [
+                            { progress: 20, text: '正在分析您的描述...' },
+                            { progress: 40, text: '正在生成视频帧...' },
+                            { progress: 60, text: '正在应用风格...' },
+                            { progress: 80, text: '正在合成视频...' },
+                            { progress: 100, text: '生成完成！' }
+                        ];
+
+                        for (const step of progressSteps) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            this.progress = step.progress;
+                            this.progressText = step.text;
+                        }
+
+                        this.showToast('视频生成成功！', 'success');
+                        
+                        // 添加到最近作品
+                        this.recentWorks.unshift({
+                            id: Date.now(),
+                            title: this.videoForm.prompt.substring(0, 20) + '...',
+                            url: '',
+                            createdAt: new Date()
+                        });
+
+                        // 重置表单
+                        setTimeout(() => {
+                            this.resetVideoForm();
+                        }, 2000);
+
+                    } catch (error) {
+                        console.error('Video generation error:', error);
+                        this.showToast('视频生成失败，请重试', 'error');
+                    } finally {
+                        this.generating = false;
+                        setTimeout(() => {
+                            this.progress = 0;
+                            this.progressText = '';
+                        }, 2000);
+                    }
+                },
+
+                // 重置表单
+                resetVideoForm() {
+                    this.videoForm = {
+                        prompt: '',
+                        style: '',
+                        duration: '10',
+                        resolution: '1080'
+                    };
+                    this.generating = false;
+                    this.progress = 0;
+                    this.progressText = '';
+                },
+
+                // 显示提示
+                showToast(message, type = 'info') {
+                    const icons = {
+                        success: 'fas fa-check-circle',
+                        error: 'fas fa-exclamation-circle',
+                        info: 'fas fa-info-circle'
+                    };
+
+                    this.toast.message = message;
+                    this.toast.type = type;
+                    this.toast.icon = icons[type];
+                    this.toast.show = true;
+
+                    const toastElement = document.getElementById('toast');
+                    toastElement.classList.add('show');
+
+                    setTimeout(() => {
+                        this.toast.show = false;
+                        toastElement.classList.remove('show');
+                    }, 3000);
+                }
+            },
+
+            mounted() {
+                // 检查用户登录状态
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
+                    this.currentUser = JSON.parse(userStr);
+                } else {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                // 模拟最近作品数据
+                this.recentWorks = [
+                    { id: 1, title: '樱花飞舞', url: '', createdAt: new Date() },
+                    { id: 2, title: '星空漫步', url: '', createdAt: new Date() },
+                    { id: 3, title: '城市夜景', url: '', createdAt: new Date() }
+                ];
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

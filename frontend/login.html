@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 漫改视频生成器</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 1200px;
+            height: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+        }
+
+        .login-form-container {
+            flex: 1;
+            padding: 60px 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-info {
+            flex: 1;
+            background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            font-size: 36px;
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .login-footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+        }
+
+        .login-footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .info-title {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .info-description {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        .feature-list {
+            text-align: left;
+            max-width: 300px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .feature-icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #f56565;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fed7d7;
+            border-radius: 6px;
+            border-left: 4px solid #f56565;
+        }
+
+        .success-message {
+            color: #48bb78;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #c6f6d5;
+            border-radius: 6px;
+            border-left: 4px solid #48bb78;
+        }
+
+        @media (max-width: 768px) {
+            .login-container {
+                flex-direction: column;
+                max-width: 400px;
+                height: auto;
+                margin: 20px;
+            }
+
+            .login-info {
+                display: none;
+            }
+
+            .login-form-container {
+                padding: 40px 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="login-container">
+            <div class="login-form-container">
+                <div class="logo">ANIME</div>
+                <h1>欢迎回来</h1>
+                <p class="subtitle">登录您的漫改视频生成器账户</p>
+                
+                <form @submit.prevent="handleLogin">
+                    <div class="form-group">
+                        <label class="form-label" for="email">邮箱地址</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            v-model="loginForm.email" 
+                            class="form-input" 
+                            placeholder="请输入您的邮箱"
+                            required
+                            :disabled="loading"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="password">密码</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            v-model="loginForm.password" 
+                            class="form-input" 
+                            placeholder="请输入您的密码"
+                            required
+                            :disabled="loading"
+                        >
+                    </div>
+                    
+                    <div v-if="errorMessage" class="error-message">
+                        {{ errorMessage }}
+                    </div>
+                    
+                    <div v-if="successMessage" class="success-message">
+                        {{ successMessage }}
+                    </div>
+                    
+                    <button type="submit" class="btn-login" :disabled="loading">
+                        <span v-if="loading" class="loading-spinner"></span>
+                        {{ loading ? '登录中...' : '登录' }}
+                    </button>
+                </form>
+                
+                <div class="login-footer">
+                    <p>还没有账户？ <a href="register.html">立即注册</a></p>
+                </div>
+            </div>
+            
+            <div class="login-info">
+                <div class="logo">ANIME</div>
+                <h2 class="info-title">AI 漫改视频生成器</h2>
+                <p class="info-description">
+                    使用先进的人工智能技术，将您的创意转化为精美的动漫视频作品
+                </p>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <div class="feature-icon">✨</div>
+                        <span>文字生成视频</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🎨</div>
+                        <span>图片生成视频</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📝</div>
+                        <span>文字生成图片</span>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🗣️</div>
+                        <span>文字转语音</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    loginForm: {
+                        email: '',
+                        password: ''
+                    },
+                    loading: false,
+                    errorMessage: '',
+                    successMessage: ''
+                }
+            },
+            methods: {
+                async handleLogin() {
+                    if (this.loading) return;
+                    
+                    this.loading = true;
+                    this.errorMessage = '';
+                    this.successMessage = '';
+                    
+                    try {
+                        // 基本验证
+                        if (!this.loginForm.email || !this.loginForm.password) {
+                            throw new Error('请填写完整的登录信息');
+                        }
+                        
+                        // 模拟登录请求
+                        const response = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            // 保存 token
+                            localStorage.setItem('token', data.token);
+                            localStorage.setItem('user', JSON.stringify(data.user));
+                            
+                            this.successMessage = '登录成功！正在跳转...';
+                            
+                            // 延迟跳转到主页
+                            setTimeout(() => {
+                                window.location.href = 'dashboard.html';
+                            }, 1500);
+                        } else {
+                            throw new Error(data.message || '登录失败');
+                        }
+                        
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        
+                        // 如果是网络错误或开发环境，模拟成功登录
+                        if (error.message.includes('Failed to fetch')) {
+                            this.simulateLogin();
+                            return;
+                        }
+                        
+                        this.errorMessage = error.message || '登录失败，请检查您的网络连接';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                // 模拟登录功能（开发环境）
+                simulateLogin() {
+                    const mockUser = {
+                        id: '1',
+                        email: this.loginForm.email,
+                        username: this.loginForm.email.split('@')[0],
+                        avatar: ''
+                    };
+                    
+                    localStorage.setItem('token', 'mock-token-' + Date.now());
+                    localStorage.setItem('user', JSON.stringify(mockUser));
+                    
+                    this.successMessage = '登录成功！（模拟模式）正在跳转...';
+                    
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 1500);
+                }
+            },
+            
+            mounted() {
+                // 检查是否已经登录
+                const token = localStorage.getItem('token');
+                const user = localStorage.getItem('user');
+                if (token && user) {
+                    window.location.href = 'dashboard.html';
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

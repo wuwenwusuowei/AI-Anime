@@ -257,6 +257,100 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
 
 // --- 4. API 路由 ---
 
+// 用户注册
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        
+        if (!username || !email || !password) {
+            return res.status(400).json({ error: '请填写完整信息' });
+        }
+
+        // 检查邮箱是否已存在
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ error: '邮箱已被注册' });
+        }
+
+        // 创建用户（密码实际应该加密，这里简化处理）
+        const user = await prisma.user.create({
+            data: { username, email, password }
+        });
+
+        // 生成token（简化版）
+        const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
+
+        res.json({
+            success: true,
+            token,
+            user: { id: user.id, username: user.username, email: user.email }
+        });
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 用户登录
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: '请填写完整信息' });
+        }
+
+        // 查找用户
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            return res.status(401).json({ error: '邮箱或密码错误' });
+        }
+
+        // 验证密码（简化版，实际应该用bcrypt）
+        if (user.password !== password) {
+            return res.status(401).json({ error: '邮箱或密码错误' });
+        }
+
+        // 生成token
+        const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
+
+        res.json({
+            success: true,
+            token,
+            user: { id: user.id, username: user.username, email: user.email }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 检查token验证（简化版）
+app.get('/api/auth/me', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ error: '未授权' });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const decoded = Buffer.from(token, 'base64').toString('utf-8');
+        const [userId, email] = decoded.split(':');
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user || user.id.toString() !== userId) {
+            return res.status(401).json({ error: 'token无效' });
+        }
+
+        res.json({
+            success: true,
+            user: { id: user.id, username: user.username, email: user.email }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/generate', upload.single('image'), async (req, res) => {
     try {
         // 从 body 获取参数

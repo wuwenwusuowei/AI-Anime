@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { useUserStore } from '../stores/user'
 
 // 路由配置
 const routes: RouteRecordRaw[] = [
@@ -25,7 +24,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('../layout/BasicLayout.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: false }, // 🔓 跳过登录验证
     children: [
       {
         path: '',
@@ -110,6 +109,8 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach(async (to, _from, next) => {
+  // 动态导入userStore以避免循环依赖
+  const { useUserStore } = await import('../stores/user')
   const userStore = useUserStore()
   
   // 设置页面标题
@@ -117,15 +118,17 @@ router.beforeEach(async (to, _from, next) => {
     document.title = `${to.meta.title} - 漫改视频生成器`
   }
   
+  // 🔓 跳过登录检查 - 直接允许访问所有页面
   // 检查是否需要登录
   if (to.meta.requiresAuth) {
-    if (!userStore.isLoggedIn) {
-      next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
-      return
-    }
+    // 注释掉登录检查逻辑
+    // if (!userStore.isLoggedIn) {
+    //   next({
+    //     path: '/login',
+    //     query: { redirect: to.fullPath }
+    //   })
+    //   return
+    // }
   }
   
   // 如果已登录且访问登录页（但没有logout参数），重定向到控制台

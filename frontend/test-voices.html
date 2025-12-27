@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS 音色测试工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .voice-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .voice-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #fafafa;
+            transition: all 0.3s ease;
+        }
+        
+        .voice-card:hover {
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .voice-card.verified {
+            border-left: 4px solid #67c23a;
+        }
+        
+        .voice-card.unverified {
+            border-left: 4px solid #e6a23c;
+        }
+        
+        .voice-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .voice-gender {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+        
+        .voice-gender.female {
+            background: #ffe6e6;
+            color: #d63384;
+        }
+        
+        .voice-gender.male {
+            background: #e6f3ff;
+            color: #0066cc;
+        }
+        
+        .voice-status {
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .test-btn {
+            background: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        
+        .test-btn:hover {
+            background: #337ecc;
+        }
+        
+        .test-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .audio-player {
+            margin-top: 15px;
+            width: 100%;
+            border-radius: 4px;
+        }
+        
+        .loading {
+            color: #409eff;
+            font-size: 12px;
+        }
+        
+        .error {
+            color: #f56c6c;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .success {
+            color: #67c23a;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .recommendations {
+            background: #f0f9ff;
+            border: 1px solid #b3d8ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .recommendations h3 {
+            color: #409eff;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 TTS 音色测试工具</h1>
+        
+        <div class="recommendations">
+            <h3>🔥 推荐音色（已验证可用）</h3>
+            <ul>
+                <li><strong>抒情女声</strong> - 标准中文女声，音色清晰自然</li>
+                <li><strong>优雅女士</strong> - 成熟女声，适合正式场合</li>
+                <li><strong>港式空少音</strong> - 标准男声，发音清晰</li>
+            </ul>
+        </div>
+        
+        <div id="voiceGrid" class="voice-grid">
+            <!-- 音色卡片将通过JavaScript动态加载 -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let currentAudios = {}; // 存储当前播放的音频
+
+        // 加载音色列表
+        async function loadVoices() {
+            try {
+                const response = await fetch(`${API_BASE}/api/tts/voices`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayVoices(result.voices);
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('加载音色失败:', error);
+                document.getElementById('voiceGrid').innerHTML = 
+                    `<div class="error">加载音色失败: ${error.message}</div>`;
+            }
+        }
+
+        // 显示音色列表
+        function displayVoices(voices) {
+            const voiceGrid = document.getElementById('voiceGrid');
+            let html = '';
+            
+            // 合并所有语言的音色
+            const allVoices = [];
+            Object.values(voices).forEach(languageVoices => {
+                if (Array.isArray(languageVoices)) {
+                    allVoices.push(...languageVoices);
+                }
+            });
+            
+            allVoices.forEach(voice => {
+                const isVerified = voice.verified !== false;
+                const statusClass = isVerified ? 'verified' : 'unverified';
+                const statusIcon = isVerified ? '✅' : '⚠️';
+                
+                html += `
+                    <div class="voice-card ${statusClass}">
+                        <div class="voice-name">${voice.name}</div>
+                        <span class="voice-gender ${voice.gender === '女' ? 'female' : 'male'}">
+                            ${voice.gender}
+                        </span>
+                        <div class="voice-status">
+                            ${statusIcon} ${isVerified ? '已验证' : '需要验证'}
+                        </div>
+                        <button class="test-btn" onclick="testVoice('${voice.id}', '${voice.name}')">
+                            🎵 测试音色
+                        </button>
+                        <div id="status-${voice.id.replace(/[^a-zA-Z0-9]/g, '')}"></div>
+                        <div id="audio-${voice.id.replace(/[^a-zA-Z0-9]/g, '')}"></div>
+                    </div>
+                `;
+            });
+            
+            voiceGrid.innerHTML = html;
+        }
+
+        // 测试音色
+        async function testVoice(voiceId, voiceName) {
+            const statusId = `status-${voiceId.replace(/[^a-zA-Z0-9]/g, '')}`;
+            const audioId = `audio-${voiceId.replace(/[^a-zA-Z0-9]/g, '')}`;
+            const statusDiv = document.getElementById(statusId);
+            const audioDiv = document.getElementById(audioId);
+            
+            // 显示加载状态
+            statusDiv.innerHTML = '<span class="loading">🔄 正在生成语音...</span>';
+            audioDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/tts/test-voice`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        voiceId: voiceId,
+                        text: `你好，我是${voiceName}，这是一段语音测试，请听听我的声音效果如何。`
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.testResult && result.testResult.hasAudio) {
+                    // 生成完整的TTS来获取音频URL
+                    await generateFullTTS(voiceId, voiceName, statusId, audioId);
+                } else {
+                    throw new Error(result.error || '音色测试失败');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">❌ 测试失败: ${error.message}</span>`;
+            }
+        }
+
+        // 生成完整的TTS音频
+        async function generateFullTTS(voiceId, voiceName, statusId, audioId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/tts/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: `你好，我是${voiceName}，这是一段语音测试，请听听我的声音效果如何。`,
+                        voiceType: voiceId,
+                        language: 'zh-CN',
+                        speed: 1.0,
+                        volume: 80,
+                        outputFormat: 'mp3'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.audioUrl) {
+                    // 停止之前的音频
+                    if (currentAudios[voiceId]) {
+                        currentAudios[voiceId].pause();
+                    }
+                    
+                    document.getElementById(statusId).innerHTML = 
+                        `<span class="success">✅ 测试成功！</span>`;
+                    
+                    document.getElementById(audioId).innerHTML = `
+                        <audio controls class="audio-player" id="audio-element-${voiceId}">
+                            <source src="${result.audioUrl}" type="audio/mpeg">
+                            您的浏览器不支持音频播放。
+                        </audio>
+                    `;
+                    
+                    // 保存音频元素引用
+                    const audioElement = document.getElementById(`audio-element-${voiceId}`);
+                    currentAudios[voiceId] = audioElement;
+                    
+                    // 自动播放
+                    audioElement.play().catch(e => {
+                        console.log('自动播放失败:', e);
+                        document.getElementById(statusId).innerHTML += 
+                            `<br><small>请手动点击播放</small>`;
+                    });
+                } else {
+                    throw new Error(result.error || '语音生成失败');
+                }
+            } catch (error) {
+                document.getElementById(statusId).innerHTML = 
+                    `<span class="error">❌ 生成失败: ${error.message}</span>`;
+            }
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('load', loadVoices);
+    </script>
+</body>
+</html>

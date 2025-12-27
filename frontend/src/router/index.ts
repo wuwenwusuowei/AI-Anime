@@ -24,7 +24,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('../layout/BasicLayout.vue'),
-    meta: { requiresAuth: false }, // 🔓 跳过登录验证
+    meta: { requiresAuth: true }, // 需要登录验证
     children: [
       {
         path: '',
@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
         name: 'Dashboard',
         component: () => import('../views/home/Dashboard.vue'),
         meta: {
-          title: '控制台'
+          title: '首页'
         }
       },
       {
@@ -107,7 +107,7 @@ const router = createRouter({
   }
 })
 
-// 路由守卫
+// 路由守卫 - 暂时跳过登录验证
 router.beforeEach(async (to, _from, next) => {
   // 动态导入userStore以避免循环依赖
   const { useUserStore } = await import('../stores/user')
@@ -115,31 +115,35 @@ router.beforeEach(async (to, _from, next) => {
   
   // 设置页面标题
   if (to.meta.title) {
-    document.title = `${to.meta.title} - 漫改视频生成器`
+    document.title = `${to.meta.title} - AI-Anime漫改视频`
   }
   
-  // 🔓 跳过登录检查 - 直接允许访问所有页面
-  // 检查是否需要登录
-  if (to.meta.requiresAuth) {
-    // 注释掉登录检查逻辑
-    // if (!userStore.isLoggedIn) {
-    //   next({
-    //     path: '/login',
-    //     query: { redirect: to.fullPath }
-    //   })
-    //   return
-    // }
+  // 暂时跳过登录验证 - 如果未登录，自动创建模拟登录状态
+  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+    const mockToken = 'mock-token-skip-login'
+    const mockUser = {
+      id: '1',
+      username: 'demo-user',
+      email: 'demo@example.com',
+      avatar: '',
+      signature: '这个人很懒，什么都没留下',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    
+    // 自动设置登录状态
+    localStorage.setItem('token', mockToken)
+    localStorage.setItem('userInfo', JSON.stringify(mockUser))
+    userStore.token = mockToken
+    userStore.userInfo = mockUser
   }
   
-  // 如果已登录且访问登录页（但没有logout参数），重定向到控制台
-  if (userStore.isLoggedIn && (to.path === '/login' || to.path === '/register')) {
-    // 如果访问 /login?logout=true，允许访问（用于重新登录）
-    if (to.query.logout === 'true') {
-      next()
+  // 如果访问登录页且已有模拟登录状态，重定向到首页
+  if ((to.path === '/login' || to.path === '/register')) {
+    if (userStore.isLoggedIn) {
+      next('/')
       return
     }
-    next('/')
-    return
   }
   
   next()

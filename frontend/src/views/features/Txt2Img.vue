@@ -5,7 +5,7 @@
         <el-icon size="64"><Tools /></el-icon>
         <h2>文字生成图片</h2>
         <p>此功能正在开发中，敬请期待...</p>
-        <el-button type="primary" @click="$router.push('/dashboard')">返回控制台</el-button>
+        <el-button type="primary" @click="$router.push('/dashboard')">返回首页</el-button>
       </div>
     </el-card>
   </div>

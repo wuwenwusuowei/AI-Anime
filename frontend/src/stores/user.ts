@@ -7,23 +7,12 @@ export const useUserStore = defineStore('user', () => {
   // 状态
   const token = ref<string>(localStorage.getItem('token') || '')
   const userInfo = ref<User | null>(
-    // 🔓 模拟用户信息 - 直接设置一个默认用户
-    {
-      id: 'demo-user',
-      username: 'Demo User',
-      email: 'demo@example.com',
-      avatar: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-    // localStorage.getItem('userInfo') 
-    //   ? JSON.parse(localStorage.getItem('userInfo')!) 
-    //   : null
+    localStorage.getItem('userInfo') 
+      ? JSON.parse(localStorage.getItem('userInfo')!) 
+      : null
   )
   const isLoggedIn = computed(() => {
-    // 🔓 模拟登录状态 - 直接返回true
-    return true; // 跳过登录检查
-    // return !!token.value; // 原始逻辑
+    return !!token.value
   })
 
   // 登录
@@ -40,6 +29,7 @@ export const useUserStore = defineStore('user', () => {
           username: params.email.split('@')[0],
           email: params.email,
           avatar: '',
+          signature: '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
@@ -125,7 +115,7 @@ export const useUserStore = defineStore('user', () => {
   // 更新用户信息
   const updateUserInfo = (newUserInfo: Partial<User>) => {
     if (userInfo.value) {
-      userInfo.value = { ...userInfo.value, ...newUserInfo }
+      userInfo.value = { ...userInfo.value, ...newUserInfo, updatedAt: new Date().toISOString() }
       localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
     }
   }

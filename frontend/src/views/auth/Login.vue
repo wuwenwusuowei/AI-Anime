@@ -5,9 +5,9 @@
       <div class="auth-info">
         <div class="logo">
           <el-icon size="48"><VideoPlay /></el-icon>
-          <span class="logo-text">漫改视频</span>
+          <span class="logo-text">AI-Anime漫改视频</span>
         </div>
-        <h1 class="title">AI 漫改视频生成器</h1>
+        <h1 class="title">AI-Anime漫改视频生成器</h1>
         <p class="subtitle">使用先进的人工智能技术，将您的创意转化为精美的动漫视频作品</p>
         
         <div class="features">

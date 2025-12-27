@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>布局预览 - 漫改视频</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+        }
+
+        /* 新的顶部导航栏样式 */
+        .top-header {
+            background-color: #fff;
+            border-bottom: 2px solid #e6e8eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            height: 80px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            gap: 40px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .logo-container .logo-icon {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-right: 12px;
+        }
+
+        .logo-container .logo-text {
+            font-size: 20px;
+            font-weight: 600;
+            color: #303133;
+        }
+
+        .top-nav-menu {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .top-nav-menu .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: #606266;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .top-nav-menu .nav-item:hover {
+            background-color: #f5f7fa;
+            color: #409eff;
+            transform: translateY(-2px);
+        }
+
+        .top-nav-menu .nav-item.active {
+            background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+        }
+
+        .top-nav-menu .nav-item .nav-icon {
+            font-size: 18px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .top-nav-menu .nav-item .nav-text {
+            font-weight: 500;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-shrink: 0;
+        }
+
+        .breadcrumb {
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            border: 1px solid #e6e8eb;
+        }
+
+        .user-info:hover {
+            background: #f5f7fa;
+            border-color: #409eff;
+            box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+        }
+
+        .user-info .username {
+            font-size: 14px;
+            color: #303133;
+            font-weight: 500;
+        }
+
+        .user-info .arrow-down {
+            font-size: 12px;
+            color: #909399;
+        }
+
+        .main-container {
+            padding: 24px;
+            background-color: #f5f7fa;
+            min-height: calc(100vh - 80px);
+        }
+
+        .demo-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-section {
+            margin-bottom: 30px;
+        }
+
+        .demo-section h2 {
+            color: #303133;
+            margin-bottom: 15px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: #f9f9f9;
+            border: 1px solid #e6e8eb;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            border-color: #409eff;
+        }
+
+        .feature-card h3 {
+            color: #409eff;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .feature-card p {
+            color: #606266;
+            line-height: 1.6;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .header-content {
+                padding: 0 16px;
+                gap: 24px;
+            }
+
+            .top-nav-menu .nav-item {
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .top-header {
+                height: auto;
+            }
+
+            .header-content {
+                flex-direction: column;
+                padding: 12px;
+                gap: 12px;
+            }
+
+            .top-nav-menu {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 4px;
+            }
+
+            .top-nav-menu .nav-item {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .logo-container .logo-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 20px;
+            }
+
+            .logo-container .logo-text {
+                font-size: 16px;
+            }
+
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .breadcrumb {
+                display: none;
+            }
+
+            .main-container {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <header class="top-header">
+        <div class="header-content">
+            <!-- Logo -->
+            <div class="logo-container">
+                <div class="logo-icon">🎬</div>
+                <span class="logo-text">漫改视频</span>
+            </div>
+
+            <!-- 横向导航菜单 -->
+            <nav class="top-nav-menu">
+                <a href="#dashboard" class="nav-item active">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-text">首页</span>
+                </a>
+                <a href="#txt2img" class="nav-item">
+                    <span class="nav-icon">🖼️</span>
+                    <span class="nav-text">文字生成图片</span>
+                </a>
+                <a href="#img2img" class="nav-item">
+                    <span class="nav-icon">🖼️</span>
+                    <span class="nav-text">图片生成图片</span>
+                </a>
+                <a href="#img2vid" class="nav-item">
+                    <span class="nav-icon">▶️</span>
+                    <span class="nav-text">图片生成视频</span>
+                </a>
+                <a href="#tts" class="nav-item">
+                    <span class="nav-icon">🎤</span>
+                    <span class="nav-text">文字转语音</span>
+                </a>
+                <a href="#history" class="nav-item">
+                    <span class="nav-icon">🕐</span>
+                    <span class="nav-text">历史记录</span>
+                </a>
+                <a href="#settings" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">设置</span>
+                </a>
+            </nav>
+
+            <!-- 用户菜单 -->
+            <div class="header-right">
+                <div class="breadcrumb">
+                    面包屑导航 / 当前页面
+                </div>
+                <div class="user-info">
+                    <span class="username">用户</span>
+                    <span class="arrow-down">▼</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-container">
+        <div class="demo-content">
+            <div class="demo-section">
+                <h1>🎉 新布局预览</h1>
+                <p>导航栏已成功从左侧移至顶端并横向排列，保持了原有的图标和顺序。</p>
+                
+                <h2>✨ 新布局特点</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>📍 顶部导航</h3>
+                        <p>所有导航项现在位于顶部，横向排列，更容易访问</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🎨 现代化设计</h3>
+                        <p>采用渐变色背景、阴影效果和悬停动画</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>📱 响应式布局</h3>
+                        <p>在移动设备上自动调整布局，保持良好体验</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🔄 顺序保持</h3>
+                        <p>所有功能按钮保持原有顺序和图标不变</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-section">
+                <h2>🎮 交互效果</h2>
+                <p>将鼠标悬停在顶部的导航按钮上查看交互效果</p>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

@@ -12,6 +12,9 @@ import { pipeline } from 'stream';
 import { promisify } from 'util';
 import 'dotenv/config';
 import authRoutes from './routes/auth.js';
+import videoRoutes from './routes/videos.js';
+import taskRoutes from './routes/tasks.js';
+import templateRoutes from './routes/templates.js';
 
 const streamPipeline = promisify(pipeline);
 
@@ -35,14 +38,57 @@ const DURATION_MAP = {
 
 // --- 2. 基础配置 ---
 const app = express();
-// const prisma = new PrismaClient();
+
+// 强制设置数据库URL为SQLite
+process.env.DATABASE_URL = 'file:./prisma/dev.db';
+
+const prisma = new PrismaClient();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// 数据库初始化函数
+async function initializeDatabase() {
+  try {
+    await prisma.$connect();
+    console.log('✅ 数据库连接成功');
+    
+    // 测试基本查询
+    const userCount = await prisma.user.count();
+    console.log(`📊 当前用户数量: ${userCount}`);
+    
+    const videoCount = await prisma.video.count();
+    console.log(`📊 当前视频数量: ${videoCount}`);
+    
+    const taskCount = await prisma.videoTask.count();
+    console.log(`📊 当前任务数量: ${taskCount}`);
+    
+    console.log('✅ 数据库初始化完成');
+  } catch (error) {
+    console.error('❌ 数据库初始化失败:', error.message);
+    
+    // 如果是表不存在的错误，尝试创建表
+    if (error.message.includes('no such table')) {
+      console.log('🔧 尝试创建数据库表...');
+      try {
+        // 这里可以添加手动创建表的逻辑
+        console.log('⚠️  请运行 npx prisma db push 来创建表结构');
+      } catch (createError) {
+        console.error('❌ 创建表失败:', createError.message);
+      }
+    }
+  }
+}
 
 app.use(cors());
 app.use(express.json());
 
 // 🟢 [新增] 配置静态目录，让前端能访问本地视频文件
 app.use(express.static('public'));
+
+// 注册路由
+app.use('/api/auth', authRoutes);
+app.use('/api/videos', videoRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/templates', templateRoutes);
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -862,6 +908,10 @@ app.get('/api/auth/me', async (req, res) => {
 
 app.post('/api/generate', upload.single('image'), async (req, res) => {
     try {
+        // 调试信息
+        console.log('📋 Request body:', req.body);
+        console.log('📁 Uploaded file:', req.file);
+        
         // 从 body 获取参数
         const { prompt, resolution, duration } = req.body;
         const file = req.file;
@@ -997,8 +1047,72 @@ if (!fs.existsSync(audioDir)) {
     console.log(`📁 创建音频目录: ${audioDir}`);
 }
 
+// 修改密码
+app.post('/api/auth/change-password', async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: "请提供当前密码和新密码" });
+        }
+        
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: "新密码长度不能少于6位" });
+        }
+        
+        // 获取用户token
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+        
+        if (!token) {
+            return res.status(401).json({ error: "未登录" });
+        }
+        
+        // 验证token
+        const jwt = await import('jsonwebtoken');
+        const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
+        const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+        
+        if (!user) {
+            return res.status(401).json({ error: "用户不存在" });
+        }
+        
+        // 验证当前密码
+        const bcrypt = await import('bcryptjs');
+        const isPasswordValid = await bcrypt.default.compare(currentPassword, user.password);
+        
+        if (!isPasswordValid) {
+            return res.status(400).json({ error: "当前密码错误" });
+        }
+        
+        // 生成新密码的hash
+        const hashedNewPassword = await bcrypt.default.hash(newPassword, 10);
+        
+        // 更新密码
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { password: hashedNewPassword }
+        });
+        
+        console.log(`🔑 用户 ${user.username} 修改密码成功`);
+        
+        res.json({ success: true });
+        
+    } catch (error) {
+        console.error('修改密码错误:', error);
+        res.status(500).json({ error: "服务器内部错误" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 服务已启动: http://localhost:${PORT}`);
-    console.log(`🎤 TTS功能已配置，请确保在.env文件中填写Minimax API信息`);
+
+// 启动服务器前先初始化数据库
+initializeDatabase().then(() => {
+    app.listen(PORT, () => {
+        console.log(`🚀 服务已启动: http://localhost:${PORT}`);
+        console.log(`🎤 TTS功能已配置，请确保在.env文件中填写Minimax API信息`);
+    });
+}).catch(error => {
+    console.error('❌ 服务器启动失败:', error);
+    process.exit(1);
 });

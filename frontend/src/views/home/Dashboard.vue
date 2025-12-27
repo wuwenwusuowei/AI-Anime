@@ -1,591 +1,353 @@
 <template>
   <div class="dashboard">
-      <!-- 统计卡片 -->
-      <div class="stats-grid">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-left">
-              <div class="stat-value">{{ stats.totalVideos }}</div>
-              <div class="stat-label">生成视频</div>
-              <div class="stat-change positive">
-                <el-icon><TrendCharts /></el-icon>
-                <span>12% 较上月</span>
-              </div>
-            </div>
-            <div class="stat-icon video">
-              <el-icon><VideoPlay /></el-icon>
-            </div>
-          </div>
-        </el-card>
-
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-left">
-              <div class="stat-value">{{ stats.totalCredits }}</div>
-              <div class="stat-label">可用积分</div>
-              <div class="stat-change positive">
-                <el-icon><TrendCharts /></el-icon>
-                <span>+500 今日</span>
-              </div>
-            </div>
-            <div class="stat-icon credits">
-              <el-icon><Coin /></el-icon>
-            </div>
-          </div>
-        </el-card>
-
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-left">
-              <div class="stat-value">{{ stats.totalTime }}</div>
-              <div class="stat-label">总时长(分钟)</div>
-              <div class="stat-change positive">
-                <el-icon><TrendCharts /></el-icon>
-                <span>8% 增长</span>
-              </div>
-            </div>
-            <div class="stat-icon time">
-              <el-icon><Clock /></el-icon>
-            </div>
-          </div>
-        </el-card>
-
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-content">
-            <div class="stat-left">
-              <div class="stat-value">{{ stats.storageUsed }}GB</div>
-              <div class="stat-label">存储使用</div>
-              <div class="stat-change negative">
-                <el-icon><TrendCharts /></el-icon>
-                <span>2% 减少</span>
-              </div>
-            </div>
-            <div class="stat-icon storage">
-              <el-icon><FolderOpened /></el-icon>
-            </div>
-          </div>
-        </el-card>
+    <!-- 项目标题区域 -->
+    <div class="hero-section">
+      <div class="hero-content">
+      <h1 class="hero-title">AI-Anime漫改视频</h1>
+      <p class="hero-subtitle">AI动态漫画视频生成平台，让创意变为现实</p>
+        <p class="hero-description">
+          通过先进的生成式AI技术，将您的文字描述转换为精美的动态漫画作品，
+          无需专业绘画技能，人人都能成为漫画创作者
+        </p>
       </div>
-
-      <!-- 功能卡片 -->
-      <div class="features-section">
-        <h2 class="section-title">功能中心</h2>
-        <div class="features-grid">
-          <el-card
-            class="feature-card"
-            shadow="hover"
-            @click="navigateToFeature('/txt2img')"
-          >
-            <div class="feature-content">
-              <div class="feature-icon txt2img">
-                <el-icon><EditPen /></el-icon>
-              </div>
-              <h3 class="feature-title">文字生成图片</h3>
-              <p class="feature-description">
-                使用先进的AI技术将您的文字描述转换为高质量的动漫风格图片
-              </p>
-              <div class="feature-status">
-                <el-tag type="success" size="small">
-                  <el-icon><Check /></el-icon>
-                  可用
-                </el-tag>
-              </div>
-            </div>
-          </el-card>
-
-          <el-card
-            class="feature-card"
-            shadow="hover"
-            @click="navigateToFeature('/img2img')"
-          >
-            <div class="feature-content">
-              <div class="feature-icon img2img">
-                <el-icon><Picture /></el-icon>
-              </div>
-              <h3 class="feature-title">图片生成图片</h3>
-              <p class="feature-description">
-                基于参考图片生成新的创意图片，支持风格迁移和内容重绘
-              </p>
-              <div class="feature-status">
-                <el-tag type="success" size="small">
-                  <el-icon><Check /></el-icon>
-                  可用
-                </el-tag>
-              </div>
-            </div>
-          </el-card>
-
-          <el-card
-            class="feature-card"
-            shadow="hover"
-            @click="navigateToFeature('/img2vid')"
-          >
-            <div class="feature-content">
-              <div class="feature-icon img2vid">
-                <el-icon><VideoCamera /></el-icon>
-              </div>
-              <h3 class="feature-title">图片生成视频</h3>
-              <p class="feature-description">
-                将静态图片转换为动态视频，让您的创作更加生动有趣
-              </p>
-              <div class="feature-status">
-                <el-tag type="success" size="small">
-                  <el-icon><Check /></el-icon>
-                  可用
-                </el-tag>
-              </div>
-            </div>
-          </el-card>
-
-          <el-card
-            class="feature-card coming-soon"
-            shadow="hover"
-            @click="navigateToFeature('/tts')"
-          >
-            <div class="feature-content">
-              <div class="feature-icon tts">
-                <el-icon><Microphone /></el-icon>
-              </div>
-              <h3 class="feature-title">文字转语音</h3>
-              <p class="feature-description">
-                使用自然语音合成技术将文字转换为逼真的语音输出
-              </p>
-              <div class="feature-status">
-                <el-tag type="warning" size="small">
-                  <el-icon><Clock /></el-icon>
-                  敬请期待
-                </el-tag>
-              </div>
-            </div>
-          </el-card>
-        </div>
-      </div>
-
-      <!-- 最近作品 -->
-      <el-card class="recent-works" shadow="hover">
-        <template #header>
-          <div class="works-header">
-            <h3>最近作品</h3>
-            <el-button type="primary" plain @click="navigateToFeature('/history')">
-              查看全部
-            </el-button>
-          </div>
-        </template>
-
-        <div v-if="recentWorks.length > 0" class="works-grid">
-          <div
-            v-for="work in recentWorks"
-            :key="work.id"
-            class="work-item"
-            @click="viewWork(work)"
-          >
-            <div class="work-preview">
-              <el-image
-                :src="work.thumbnail || '/placeholder.png'"
-                fit="cover"
-                class="work-image"
-              >
-                <template #error>
-                  <div class="image-placeholder">
-                    <el-icon size="32"><Picture /></el-icon>
-                  </div>
-                </template>
-              </el-image>
-              <div class="work-overlay">
-                <el-icon size="24" v-if="work.type === 'img2vid'"><VideoPlay /></el-icon>
-                <el-icon size="24" v-else><ZoomIn /></el-icon>
-              </div>
-            </div>
-            <div class="work-info">
-              <h4 class="work-title">{{ work.title }}</h4>
-              <p class="work-time">{{ formatTime(work.createdAt) }}</p>
-            </div>
-          </div>
-        </div>
-
-        <el-empty v-else description="还没有创作记录">
-          <el-button type="primary" @click="navigateToFeature('/img2vid')">
-            开始创作
-          </el-button>
-        </el-empty>
-      </el-card>
     </div>
+
+    <!-- 六大功能特点标签 -->
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><EditPen /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">智能文字解析</h3>
+        <p class="feature-description">
+          支持自然语言文字输入，AI智能解析角色特征、场景信息、动作指令和情感倾向，
+          精准还原您的创作构思
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><VideoCamera /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">AI动态视频生成</h3>
+        <p class="feature-description">
+          基于文字描述生成高质量动态漫画视频，支持单镜头多镜头连续生成，
+          角色动作流畅自然，场景细节丰富
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><Microphone /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">智能音效生成</h3>
+        <p class="feature-description">
+          根据视频内容自动匹配背景音乐、角色语音、环境音效和动作音效，
+          音画同步，完美融合
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><Scissor /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">专业时间轴编辑</h3>
+        <p class="feature-description">
+          直观的时间轴界面，支持视频片段拖放、分割、合并，添加转场特效、文字字幕，
+          轻松完成专业剪辑
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><FolderOpened /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">云端素材管理</h3>
+        <p class="feature-description">
+          生成的素材自动保存至个人云端素材库，支持分类标签、智能搜索、
+          收藏管理，跨设备同步使用
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><MagicStick /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">零门槛操作</h3>
+        <p class="feature-description">
+          界面简洁直观，操作流程清晰，提供新手引导和一键应用功能，
+          无需专业技能，快速上手创作
+        </p>
+      </div>
+    </div>
+
+    <!-- 开始创作按钮 -->
+    <div class="action-section">
+      <el-button 
+        type="primary" 
+        size="large" 
+        class="start-btn"
+        @click="startCreating"
+      >
+        <el-icon><VideoPlay /></el-icon>
+        开始创作
+      </el-button>
+      <p class="action-description">立即体验AI动态漫画创作的魅力</p>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useGenerationStore } from '@/stores/generation'
-import { ElMessage } from 'element-plus'
 import {
-  VideoPlay,
-  TrendCharts,
-  Coin,
-  Clock,
-  FolderOpened,
   EditPen,
-  Picture,
   VideoCamera,
   Microphone,
-  Check,
-  ZoomIn
+  Scissor,
+  FolderOpened,
+  MagicStick,
+  VideoPlay
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const generationStore = useGenerationStore()
 
-// 响应式数据
-const stats = ref({
-  totalVideos: 12,
-  totalCredits: 2500,
-  totalTime: 45,
-  storageUsed: 2.3
-})
-
-const recentWorks = ref<any[]>([])
-
-// 方法
-const navigateToFeature = (path: string) => {
-  // 检查是否是"敬请期待"的功能
-  if (path === '/tts') {
-    ElMessage.info('此功能正在开发中，敬请期待！')
-    return
-  }
-  router.push(path)
+const startCreating = () => {
+  router.push('/img2vid')
 }
-
-const viewWork = (work: any) => {
-  // 实现查看作品详情的逻辑
-  console.log('View work:', work)
-}
-
-const formatTime = (time: string) => {
-  const date = new Date(time)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const days = Math.floor(hours / 24)
-  
-  if (days > 0) {
-    return `${days}天前`
-  } else if (hours > 0) {
-    return `${hours}小时前`
-  } else {
-    return '刚刚'
-  }
-}
-
-// 生命周期
-onMounted(() => {
-  // 加载最近作品
-  generationStore.loadHistory()
-  recentWorks.value = generationStore.history.slice(0, 6)
-})
 </script>
 
 <style lang="scss" scoped>
 .dashboard {
   padding: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-  margin-bottom: 32px;
+.hero-section {
+  text-align: center;
+  padding: 50px 24px 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
   
-  .stat-card {
-    border: none;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%23ffffff" fill-opacity="0.05"><path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/></g></g></svg>') repeat;
+    opacity: 0.3;
+  }
+  
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .hero-title {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    
+    @media (max-width: 768px) {
+      font-size: 28px;
+    }
+  }
+  
+  .hero-subtitle {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    opacity: 0.9;
+    
+    @media (max-width: 768px) {
+      font-size: 16px;
+    }
+  }
+  
+  .hero-description {
+    font-size: 14px;
+    line-height: 1.5;
+    opacity: 0.8;
+    max-width: 500px;
+    margin: 0 auto;
+    
+    @media (max-width: 768px) {
+      font-size: 13px;
+    }
+  }
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 20px;
+  padding: 40px 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+  
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    max-width: 800px;
+  }
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(6, 1fr);
+    padding: 30px 16px;
+    gap: 16px;
+  }
+  
+  .feature-card {
+    background: white;
     border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+      background-size: 300% 100%;
+      transition: background-position 0.6s ease;
+      background-position: 0% 0%;
+    }
     
     &:hover {
       transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    }
-    
-    .stat-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      
-      .stat-left {
-        .stat-value {
-          font-size: 32px;
-          font-weight: bold;
-          color: var(--text-primary);
-          line-height: 1;
-          margin-bottom: 8px;
-        }
-        
-        .stat-label {
-          font-size: 14px;
-          color: var(--text-secondary);
-          margin-bottom: 12px;
-        }
-        
-        .stat-change {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 12px;
-          font-weight: 600;
-          
-          &.positive {
-            color: var(--success-color);
-          }
-          
-          &.negative {
-            color: var(--danger-color);
-          }
-        }
-      }
-      
-      .stat-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        color: white;
-        
-        &.video {
-          background: linear-gradient(135deg, #667eea, #764ba2);
-        }
-        
-        &.credits {
-          background: linear-gradient(135deg, #f093fb, #f5576c);
-        }
-        
-        &.time {
-          background: linear-gradient(135deg, #4facfe, #00f2fe);
-        }
-        
-        &.storage {
-          background: linear-gradient(135deg, #fa709a, #fee140);
-        }
-      }
-    }
-  }
-}
-
-.features-section {
-  margin-bottom: 32px;
-  
-  .section-title {
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--text-primary);
-    margin-bottom: 20px;
-  }
-  
-  .features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-    
-    .feature-card {
-      border: none;
-      border-radius: 16px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(74, 144, 226, 0.15);
       
       &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-      }
-      
-      &:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-      }
-      
-      &.coming-soon {
-        opacity: 0.8;
-        cursor: not-allowed;
-        
-        &:hover {
-          transform: translateY(-4px);
-        }
-      }
-      
-      .feature-content {
-        text-align: center;
-        padding: 20px;
-        
-        .feature-icon {
-          width: 80px;
-          height: 80px;
-          border-radius: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 20px;
-          font-size: 36px;
-          color: white;
-          
-          &.txt2img {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-          }
-          
-          &.img2img {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
-          }
-          
-          &.img2vid {
-            background: linear-gradient(135deg, #4facfe, #00f2fe);
-          }
-          
-          &.tts {
-            background: linear-gradient(135deg, #fa709a, #fee140);
-          }
-        }
-        
-        .feature-title {
-          font-size: 20px;
-          font-weight: 600;
-          color: var(--text-primary);
-          margin-bottom: 12px;
-        }
-        
-        .feature-description {
-          font-size: 14px;
-          color: var(--text-secondary);
-          line-height: 1.6;
-          margin-bottom: 16px;
-          min-height: 48px;
-        }
-        
-        .feature-status {
-          .el-tag {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-          }
-        }
+        background-position: 100% 0%;
       }
     }
-  }
-}
-
-.recent-works {
-  border: none;
-  border-radius: 16px;
-  
-  .works-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     
-    h3 {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin: 0;
-    }
-  }
-  
-  .works-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 16px;
-    
-    .work-item {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      cursor: pointer;
+    .feature-icon-wrapper {
+      display: inline-block;
+      margin-bottom: 16px;
       transition: all 0.3s ease;
-      background: var(--bg-page);
+    }
+    
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 14px;
+      background: #4A90E2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: white;
+      transition: all 0.3s ease;
       
-      &:hover {
-        transform: scale(1.05);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-        
-        .work-overlay {
-          opacity: 1;
-        }
+      @media (max-width: 768px) {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
       }
+    }
+    
+    .feature-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 12px;
+      line-height: 1.3;
       
-      .work-preview {
-        position: relative;
-        aspect-ratio: 16/9;
-        
-        .work-image {
-          width: 100%;
-          height: 100%;
-        }
-        
-        .image-placeholder {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--bg-page);
-          color: var(--text-secondary);
-        }
-        
-        .work-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          opacity: 0;
-          transition: opacity 0.3s ease;
-        }
+      @media (max-width: 768px) {
+        font-size: 16px;
       }
+    }
+    
+    .feature-description {
+      font-size: 13px;
+      color: #5a6c7d;
+      line-height: 1.6;
+      margin-bottom: 0;
+      min-height: 60px;
       
-      .work-info {
-        padding: 12px;
-        
-        .work-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--text-primary);
-          margin: 0 0 4px 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        
-        .work-time {
-          font-size: 12px;
-          color: var(--text-secondary);
-          margin: 0;
-        }
+      @media (max-width: 768px) {
+        font-size: 12px;
+        min-height: auto;
       }
     }
   }
 }
 
-// 响应式设计
-@media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
+.action-section {
+  text-align: center;
+  padding: 40px 24px 60px;
+  
+  .start-btn {
+    font-size: 18px;
+    font-weight: 600;
+    padding: 16px 40px;
+    height: auto;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
+      background: linear-gradient(135deg, #5a6fd8, #6a4190);
+    }
+    
+    .el-icon {
+      margin-right: 8px;
+      font-size: 20px;
+    }
   }
   
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .works-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .action-description {
+    margin-top: 16px;
+    color: #5a6c7d;
+    font-size: 14px;
+    font-weight: 500;
   }
 }
+
+// 动画效果
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.feature-card:nth-child(1) { .feature-icon-wrapper { animation: float 6s ease-in-out infinite; } }
+.feature-card:nth-child(2) { .feature-icon-wrapper { animation: float 6s ease-in-out infinite; animation-delay: 1s; } }
+.feature-card:nth-child(3) { .feature-icon-wrapper { animation: float 6s ease-in-out infinite; animation-delay: 2s; } }
+.feature-card:nth-child(4) { .feature-icon-wrapper { animation: float 6s ease-in-out infinite; animation-delay: 3s; } }
+.feature-card:nth-child(5) { .feature-icon-wrapper { animation: float 6s ease-in-out infinite; animation-delay: 4s; } }
+.feature-card:nth-child(6) { .feature-icon-wrapper { animation: float 6s ease-in-out infinite; animation-delay: 5s; } }
 </style>

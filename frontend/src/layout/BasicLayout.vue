@@ -1,17 +1,17 @@
 <template>
   <div class="app-wrapper">
     <el-container class="layout-container">
-      <!-- 侧边栏 -->
-      <el-aside width="220px" class="sidebar-container">
-        <div class="sidebar-content">
+      <!-- 顶部导航栏（包含Logo和横向菜单） -->
+      <el-header class="top-header">
+        <div class="header-content">
           <!-- Logo -->
           <div class="logo-container">
             <div class="logo-icon">🎬</div>
-            <span class="logo-text">漫改视频</span>
+            <span class="logo-text">AI-Anime漫改视频</span>
           </div>
           
-          <!-- 导航菜单 -->
-          <nav class="nav-menu">
+          <!-- 横向导航菜单 -->
+          <nav class="top-nav-menu">
             <router-link
               v-for="item in menuItems"
               :key="item.path"
@@ -25,37 +25,9 @@
               <span class="nav-text">{{ item.title }}</span>
             </router-link>
           </nav>
-        </div>
-      </el-aside>
-
-      <el-container>
-        <!-- 顶部导航 -->
-        <el-header class="header-container">
-          <div class="header-left">
-            <el-button
-              type="text"
-              class="collapse-btn"
-              @click="toggleSidebar"
-            >
-              <el-icon>
-                <Expand v-if="sidebarCollapsed" />
-                <Fold v-else />
-              </el-icon>
-            </el-button>
-            
-            <el-breadcrumb separator="/">
-              <el-breadcrumb-item
-                v-for="item in breadcrumbs"
-                :key="item.path"
-                :to="item.path"
-              >
-                {{ item.title }}
-              </el-breadcrumb-item>
-            </el-breadcrumb>
-          </div>
           
+          <!-- 用户菜单 -->
           <div class="header-right">
-            <!-- 用户菜单 -->
             <el-dropdown @command="handleUserCommand">
               <div class="user-info">
                 <el-avatar :src="userInfo?.avatar" :size="32">
@@ -69,14 +41,6 @@
               
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>
-                    个人资料
-                  </el-dropdown-item>
-                  <el-dropdown-item command="settings">
-                    <el-icon><Setting /></el-icon>
-                    设置
-                  </el-dropdown-item>
                   <el-dropdown-item divided command="logout">
                     <el-icon><SwitchButton /></el-icon>
                     退出登录
@@ -89,29 +53,27 @@
               </template>
             </el-dropdown>
           </div>
-        </el-header>
+        </div>
+      </el-header>
 
-        <!-- 主内容区 -->
-        <el-main class="main-container">
-          <router-view v-slot="{ Component, route }">
-            <transition name="fade-transform" mode="out-in">
-              <component :is="Component" :key="route.path" />
-            </transition>
-          </router-view>
-        </el-main>
-      </el-container>
+      <!-- 主内容区 -->
+      <el-main class="main-container">
+        <router-view v-slot="{ Component, route }">
+          <transition name="fade-transform" mode="out-in">
+            <component :is="Component" :key="route.path" />
+          </transition>
+        </router-view>
+      </el-main>
     </el-container>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessageBox } from 'element-plus'
 import {
-  Expand,
-  Fold,
   ArrowDown,
   User,
   Setting,
@@ -127,9 +89,6 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-// 响应式数据
-const sidebarCollapsed = ref(false)
-
 // 计算属性
 const userInfo = computed(() => userStore.userInfo)
 
@@ -137,7 +96,7 @@ const userInfo = computed(() => userStore.userInfo)
 const menuItems = [
   {
     path: '/dashboard',
-    title: '控制台',
+    title: '首页',
     icon: House
   },
   {
@@ -172,28 +131,11 @@ const menuItems = [
   }
 ]
 
-// 面包屑导航
-const breadcrumbs = computed(() => {
-  const matched = route.matched.filter(item => item.meta && item.meta.title)
-  return matched.map(item => ({
-    path: item.path,
-    title: item.meta.title as string
-  }))
-})
+
 
 // 方法
-const toggleSidebar = () => {
-  sidebarCollapsed.value = !sidebarCollapsed.value
-}
-
 const handleUserCommand = async (command: string) => {
   switch (command) {
-    case 'profile':
-      router.push('/profile')
-      break
-    case 'settings':
-      router.push('/settings')
-      break
     case 'logout':
       try {
         await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -215,16 +157,6 @@ const handleUserCommand = async (command: string) => {
       break
   }
 }
-
-// 监听路由变化，自动展开侧边栏
-watch(
-  () => route.path,
-  () => {
-    if (window.innerWidth < 768) {
-      sidebarCollapsed.value = true
-    }
-  }
-)
 </script>
 
 <style scoped>
@@ -240,134 +172,128 @@ watch(
 
 .el-header {
   padding: 0;
-  height: 60px;
+  height: 80px; /* 增加高度以容纳横向导航 */
 }
 
-.el-aside {
-  background-color: #304156; /* 深色侧边栏背景 */
-  color: #fff;
-  height: 100vh;
+.top-header {
+  background-color: #fff;
+  border-bottom: 2px solid #e6e8eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.sidebar-content {
+.header-content {
   height: 100%;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  padding: 0 24px;
+  gap: 40px; /* 增加各部分间距 */
 }
 
 .logo-container {
-  height: 60px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  border-bottom: 1px solid #263445;
+  flex-shrink: 0; /* 防止Logo被压缩 */
   
   .logo-icon {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 28px;
+    margin-right: 12px;
   }
   
   .logo-text {
-    margin-left: 12px;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
-    color: #fff;
+    color: #303133;
   }
 }
 
-.nav-menu {
+.top-nav-menu {
   flex: 1;
-  padding: 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 导航项之间的间距 */
   
   .nav-item {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
-    color: #bfcbd9;
+    padding: 12px 16px;
+    color: #606266;
     text-decoration: none;
     transition: all 0.3s ease;
-    margin-bottom: 4px;
+    border-radius: 8px;
+    font-size: 14px;
+    white-space: nowrap; /* 防止文字换行 */
     
     &:hover {
-      background: #263445;
+      background-color: #f5f7fa;
       color: #409eff;
+      transform: translateY(-2px);
     }
     
     &.active {
-      background: #409eff;
+      background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
       color: #fff;
-      border-right: 3px solid #409eff;
+      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
     }
     
     .nav-icon {
       font-size: 18px;
-      width: 24px;
-      text-align: center;
+      margin-right: 8px;
+      display: flex;
+      align-items: center;
     }
     
     .nav-text {
-      margin-left: 12px;
-      font-size: 14px;
+      font-weight: 500;
     }
   }
 }
 
-.header-container {
-  background-color: #fff;
-  border-bottom: 1px solid #dcdfe6;
+.header-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
+  gap: 16px; /* 调整间距 */
+  flex-shrink: 0; /* 防止右侧元素被压缩 */
+}
+
+
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  border: 1px solid #e6e8eb;
   
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    
-    .collapse-btn {
-      font-size: 18px;
-    }
+  &:hover {
+    background: #f5f7fa;
+    border-color: #409eff;
+    box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
   }
   
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    
-    .user-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      padding: 8px 12px;
-      border-radius: 8px;
-      transition: background 0.3s ease;
-      
-      &:hover {
-        background: #f5f7fa;
-      }
-      
-      .username {
-        font-size: 14px;
-        color: #303133;
-      }
-      
-      .arrow-down {
-        font-size: 12px;
-        color: #909399;
-      }
-    }
+  .username {
+    font-size: 14px;
+    color: #303133;
+    font-weight: 500;
+  }
+  
+  .arrow-down {
+    font-size: 12px;
+    color: #909399;
   }
 }
 
 .main-container {
-  padding: 20px;
-  background-color: #f2f3f5;
+  padding: 24px;
+  background-color: #f5f7fa;
+  min-height: calc(100vh - 80px); /* 减去顶部header高度 */
 }
 
 /* 过渡动画 */
@@ -378,11 +304,68 @@ watch(
 
 .fade-transform-enter-from {
   opacity: 0;
-  transform: translateX(30px);
+  transform: translateY(20px);
 }
 
 .fade-transform-leave-to {
   opacity: 0;
-  transform: translateX(-30px);
+  transform: translateY(-20px);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .header-content {
+    padding: 0 16px;
+    gap: 24px;
+  }
+  
+  .top-nav-menu .nav-item {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-header {
+    height: auto;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .top-nav-menu {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+  }
+  
+  .top-nav-menu .nav-item {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .logo-container .logo-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 20px;
+  }
+  
+  .logo-container .logo-text {
+    font-size: 16px;
+  }
+  
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+
+  
+  .main-container {
+    padding: 16px;
+  }
 }
 </style>

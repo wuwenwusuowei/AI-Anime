@@ -7,7 +7,7 @@
           漫改视频生成器
         </h1>
         <nav class="nav">
-          <router-link to="/dashboard" class="nav-link active">控制台</router-link>
+          <router-link to="/dashboard" class="nav-link active">首页</router-link>
           <router-link to="/videos" class="nav-link">我的视频</router-link>
         </nav>
         <div class="user-actions">

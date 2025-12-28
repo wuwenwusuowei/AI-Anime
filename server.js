@@ -1002,20 +1002,6 @@ app.get('/api/status/:id', async (req, res) => {
     }
 });
 
-// 确保视频和音频保存目录存在
-const videosDir = path.join(__dirname, 'public', 'videos');
-const audioDir = path.join(__dirname, 'public', 'audio');
-
-if (!fs.existsSync(videosDir)) {
-    fs.mkdirSync(videosDir, { recursive: true });
-    console.log(`📁 创建视频目录: ${videosDir}`);
-}
-
-if (!fs.existsSync(audioDir)) {
-    fs.mkdirSync(audioDir, { recursive: true });
-    console.log(`📁 创建音频目录: ${audioDir}`);
-}
-
 // 修改密码
 app.post('/api/auth/change-password', async (req, res) => {
     try {

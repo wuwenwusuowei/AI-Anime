@@ -3,28 +3,21 @@ const { PrismaClient } = require('@prisma/client');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Get all tasks for a user
+// Get all video tasks for a user
 router.get('/', async (req, res) => {
   try {
-    const { userId, status, type } = req.query;
+    const { userId, status } = req.query;
     
-    const where = { userId };
+    const where = userId ? { userId } : {};
     if (status) where.status = status;
-    if (type) where.type = type;
     
-    const tasks = await prisma.task.findMany({
+    const tasks = await prisma.videoTask.findMany({
       where,
       include: {
         user: {
           select: {
             id: true,
             username: true
-          }
-        },
-        video: {
-          select: {
-            id: true,
-            title: true
           }
         }
       },
@@ -33,7 +26,7 @@ router.get('/', async (req, res) => {
 
     res.json(tasks);
   } catch (error) {
-    console.error('Error fetching tasks:', error);
+    console.error('Error fetching video tasks:', error);
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 });
@@ -43,16 +36,15 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const task = await prisma.task.findUnique({
-      where: { id },
+    const task = await prisma.videoTask.findUnique({
+      where: { id: parseInt(id) },
       include: {
         user: {
           select: {
             id: true,
             username: true
           }
-        },
-        video: true
+        }
       }
     });
 
@@ -67,17 +59,17 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create a new task
+// Create a new video task
 router.post('/', async (req, res) => {
   try {
-    const { type, userId, videoId, parameters } = req.body;
+    const { userPrompt, style, userId, translatedPrompt } = req.body;
     
-    const task = await prisma.task.create({
+    const task = await prisma.videoTask.create({
       data: {
-        type,
+        userPrompt,
+        style: style || 'anime',
         userId,
-        videoId,
-        parameters
+        translatedPrompt
       },
       include: {
         user: {
@@ -85,18 +77,12 @@ router.post('/', async (req, res) => {
             id: true,
             username: true
           }
-        },
-        video: {
-          select: {
-            id: true,
-            title: true
-          }
         }
       }
     });
 
     res.status(201).json({ 
-      message: 'Task created successfully',
+      message: 'Video task created successfully',
       task 
     });
   } catch (error) {
@@ -105,22 +91,20 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update task status and progress
+// Update task status and result
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, progress, result, errorMessage } = req.body;
+    const { status, videoUrl, promptId } = req.body;
     
     const updateData = {
       ...(status && { status }),
-      ...(progress !== undefined && { progress }),
-      ...(result && { result }),
-      ...(errorMessage && { errorMessage }),
-      ...(status === 'COMPLETED' && { completedAt: new Date() })
+      ...(videoUrl && { videoUrl }),
+      ...(promptId && { promptId })
     };
     
-    const task = await prisma.task.update({
-      where: { id },
+    const task = await prisma.videoTask.update({
+      where: { id: parseInt(id) },
       data: updateData,
       include: {
         user: {
@@ -128,8 +112,7 @@ router.patch('/:id', async (req, res) => {
             id: true,
             username: true
           }
-        },
-        video: true
+        }
       }
     });
 
@@ -140,29 +123,6 @@ router.patch('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });
-  }
-});
-
-// Cancel a task
-router.patch('/:id/cancel', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const task = await prisma.task.update({
-      where: { id },
-      data: { 
-        status: 'CANCELLED',
-        completedAt: new Date()
-      }
-    });
-
-    res.json({ 
-      message: 'Task cancelled successfully',
-      task 
-    });
-  } catch (error) {
-    console.error('Error cancelling task:', error);
-    res.status(500).json({ error: 'Failed to cancel task' });
   }
 });
 

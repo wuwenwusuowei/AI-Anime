@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '@/utils/request'
 import type { LoginParams, RegisterParams, User } from '@/types/user'
 
 export const useUserStore = defineStore('user', () => {
@@ -12,12 +11,15 @@ export const useUserStore = defineStore('user', () => {
       ? JSON.parse(localStorage.getItem('userInfo')!) 
       : null
   )
-  const isLoggedIn = computed(() => !!token.value)
+  const isLoggedIn = computed(() => {
+    return !!token.value
+  })
 
   // 登录
   const login = async (params: LoginParams) => {
     try {
-      // 这里模拟登录，实际应该调用 API
+      // 动态导入request以避免循环依赖
+      const { default: request } = await import('@/utils/request')
       const response = await request.post('/auth/login', params)
       
       // 如果是开发环境且网络错误，模拟成功
@@ -27,6 +29,7 @@ export const useUserStore = defineStore('user', () => {
           username: params.email.split('@')[0],
           email: params.email,
           avatar: '',
+          signature: '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
@@ -68,6 +71,8 @@ export const useUserStore = defineStore('user', () => {
   // 注册
   const register = async (params: RegisterParams) => {
     try {
+      // 动态导入request以避免循环依赖
+      const { default: request } = await import('@/utils/request')
       const response = await request.post('/auth/register', params)
       
       // 模拟注册成功
@@ -110,7 +115,7 @@ export const useUserStore = defineStore('user', () => {
   // 更新用户信息
   const updateUserInfo = (newUserInfo: Partial<User>) => {
     if (userInfo.value) {
-      userInfo.value = { ...userInfo.value, ...newUserInfo }
+      userInfo.value = { ...userInfo.value, ...newUserInfo, updatedAt: new Date().toISOString() }
       localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
     }
   }

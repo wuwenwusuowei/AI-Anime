@@ -22,9 +22,33 @@
                 accept="image/*"
                 :disabled="isGenerating"
                 drag
+                :show-file-list="false"
+                class="custom-upload"
               >
-                <el-icon><Plus /></el-icon>
+                <div v-if="!uploadedFile" class="upload-placeholder">
+                  <el-icon size="32"><Plus /></el-icon>
+                  <div class="upload-text">点击上传图片</div>
+                </div>
               </el-upload>
+              
+              <!-- 已上传的图片预览 -->
+              <div v-if="uploadedFile && previewUrl" class="uploaded-preview">
+                <img :src="previewUrl" class="preview-img" alt="已上传图片" />
+                <div class="preview-overlay">
+                  <el-icon class="preview-icon"><Picture /></el-icon>
+                  <div class="preview-actions">
+                    <el-button 
+                      type="danger" 
+                      size="small" 
+                      circle
+                      @click="handleRemove"
+                      :disabled="isGenerating"
+                    >
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+              </div>
             </el-form-item>
 
             <!-- 提示词 -->
@@ -116,7 +140,11 @@
             <!-- 已上传，未生成状态 -->
             <div v-if="uploadedFile && !isGenerating && !generatedVideo" class="uploaded-state">
               <img v-if="previewUrl" :src="previewUrl" class="preview-image" alt="预览" />
-              <p class="preview-text">准备就绪，点击"开始生成"</p>
+              <p class="preview-text">✅ 图片已上传，点击"开始生成"</p>
+              <div class="file-info">
+                <p><strong>文件名:</strong> {{ uploadedFile.name }}</p>
+                <p><strong>大小:</strong> {{ (uploadedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
+              </div>
             </div>
 
             <!-- 生成中状态 -->
@@ -176,11 +204,8 @@
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadUserFile, UploadFile } from 'element-plus'
-import axios from 'axios'
-import { VideoPlay, Download, Plus, VideoCamera } from '@element-plus/icons-vue'
-
-// 配置 axios baseURL
-const apiBaseUrl = 'http://localhost:3000'
+import request from '@/utils/request'
+import { VideoPlay, Download, Plus, VideoCamera, Picture, Delete } from '@element-plus/icons-vue'
 
 // 响应式数据
 const isGenerating = ref(false)
@@ -220,14 +245,24 @@ const durationMarks = {
 
 // 文件处理
 const handleFileChange = (file: UploadFile, newFileList: UploadUserFile[]) => {
+  console.log('📁 文件变化:', { file: file, newFileList: newFileList })
+  
   if (newFileList.length > 0) {
     uploadedFile.value = newFileList[0].raw as File
+    console.log('✅ 上传文件:', uploadedFile.value)
+    
     // 生成预览URL
-    if (file.url) {
-      previewUrl.value = file.url
-    } else if (file.raw) {
-      previewUrl.value = URL.createObjectURL(file.raw)
+    if (newFileList[0].url) {
+      previewUrl.value = newFileList[0].url
+      console.log('🔗 使用文件URL:', previewUrl.value)
+    } else if (uploadedFile.value) {
+      previewUrl.value = URL.createObjectURL(uploadedFile.value)
+      console.log('🔗 创建临时URL:', previewUrl.value)
     }
+  } else {
+    uploadedFile.value = null
+    previewUrl.value = ''
+    console.log('🗑️ 清空文件')
   }
 }
 
@@ -238,6 +273,7 @@ const handleExceed = () => {
 const handleRemove = () => {
   uploadedFile.value = null
   previewUrl.value = ''
+  fileList.value = []
 }
 
 // 提交任务
@@ -260,8 +296,9 @@ const handleGenerate = async () => {
   formData.append('duration', form.duration)
 
   try {
-    // 提交任务
-    const res = await axios.post(`${apiBaseUrl}/api/generate`, formData, {
+    // 提交任务 - 暂时使用原生axios绕过拦截器
+    const axios = (await import('axios')).default
+    const res = await axios.post('/api/generate', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -278,7 +315,22 @@ const handleGenerate = async () => {
     }
   } catch (error: any) {
     console.error('Generate error:', error)
-    ElMessage.error(error.response?.data?.error || '任务提交失败')
+    console.error('Error response data:', error.response?.data)
+    
+    // 更详细的错误处理
+    let errorMessage = '任务提交失败'
+    if (error.response?.status === 500) {
+      errorMessage = '服务器内部错误，请检查后端服务是否正常启动'
+    } else if (error.response?.status === 400) {
+      console.error('400错误详情:', error.response?.data)
+      errorMessage = error.response?.data?.error || '请求参数错误'
+    } else if (error.code === 'ERR_NETWORK') {
+      errorMessage = '网络连接失败，请检查后端服务是否运行在3000端口'
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error
+    }
+    
+    ElMessage.error(errorMessage)
     isGenerating.value = false
     progress.value = 0
   }
@@ -288,7 +340,8 @@ const handleGenerate = async () => {
 const startPolling = (id: number) => {
   pollingTimer = setInterval(async () => {
     try {
-      const res = await axios.get(`${apiBaseUrl}/api/status/${id}`)
+      const axios = (await import('axios')).default
+      const res = await axios.get(`/api/status/${id}`)
       const { status, videoUrl } = res.data
 
       if (status === 'PENDING') {
@@ -327,6 +380,7 @@ const startPolling = (id: number) => {
 
 // 重置表单
 const handleReset = () => {
+  console.log('🔄 重置表单')
   if (isGenerating.value && pollingTimer) {
     clearInterval(pollingTimer)
   }
@@ -380,6 +434,7 @@ onUnmounted(() => {
     height: calc(100vh - 140px);
     border: none;
     border-radius: 16px;
+    overflow: hidden;
 
     .content-wrapper {
       display: flex;
@@ -394,6 +449,10 @@ onUnmounted(() => {
   max-width: 450px;
   border-right: 1px solid var(--el-border-color-light);
   padding-right: 24px;
+  overflow-y: auto;
+  height: 100%;
+  padding-bottom: 20px;
+  box-sizing: border-box;
 
   .panel-header {
     margin-bottom: 24px;
@@ -407,6 +466,9 @@ onUnmounted(() => {
   }
 
   .generation-form {
+    min-height: 100%;
+    padding-bottom: 20px;
+    
     .el-form-item {
       margin-bottom: 24px;
 
@@ -495,6 +557,25 @@ onUnmounted(() => {
         font-size: 16px;
         color: var(--el-color-primary);
         font-weight: 500;
+        margin-top: 12px;
+      }
+      
+      .file-info {
+        margin-top: 16px;
+        padding: 12px;
+        background: var(--el-bg-color-page);
+        border-radius: 8px;
+        font-size: 14px;
+        
+        p {
+          margin: 4px 0;
+          color: var(--el-text-color-regular);
+          
+          strong {
+            color: var(--el-text-color-primary);
+            margin-right: 8px;
+          }
+        }
       }
     }
 
@@ -575,6 +656,94 @@ onUnmounted(() => {
         }
       }
     }
+  }
+}
+
+// 自定义上传组件样式
+.custom-upload {
+  :deep(.el-upload) {
+    border: 2px dashed var(--el-border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: var(--el-transition-duration-fast);
+    
+    &:hover {
+      border-color: var(--el-color-primary);
+    }
+    
+    .upload-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100%;
+      color: var(--el-text-color-secondary);
+      gap: 8px;
+      padding: 20px;
+      padding-top: 4px;
+      
+      .upload-text {
+        font-size: 14px;
+        line-height: 1;
+      }
+    }
+  }
+  
+  // 当有图片时隐藏上传区域
+  &:has(+ .uploaded-preview) {
+    :deep(.el-upload) {
+      display: none;
+    }
+  }
+}
+
+// 上传图片预览样式
+.uploaded-preview {
+  position: relative;
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto;
+  
+  .preview-img {
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: var(--el-box-shadow-light);
+    display: block;
+  }
+  
+  .preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    
+    .preview-icon {
+      color: white;
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+    
+    .preview-actions {
+      .el-button {
+        transform: scale(0.8);
+      }
+    }
+  }
+  
+  &:hover .preview-overlay {
+    opacity: 1;
   }
 }
 

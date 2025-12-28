@@ -5,7 +5,7 @@
       <div class="auth-info">
         <div class="logo">
           <el-icon size="48"><VideoPlay /></el-icon>
-          <span class="logo-text">漫改视频</span>
+          <span class="logo-text">AI-Anime漫改视频</span>
         </div>
         <h1 class="title">开启创作之旅</h1>
         <p class="subtitle">注册账户，解锁全部功能，让创意变为现实</p>
@@ -135,6 +135,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import type { FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   VideoPlay, Star, Connection, Folder, Tools, Service,
   User, Message, Lock 

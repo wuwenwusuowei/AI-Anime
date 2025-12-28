@@ -32,12 +32,6 @@
     "openai": "^6.14.0",
     "pinia": "^2.1.7",
     "prisma": "5.22.0",
-<<<<<<< HEAD
-    "sharp": "^0.34.5",
-=======
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.5",
->>>>>>> 2a128c16d34885c8f03a15f44502440d973d80c1
     "vue": "^3.4.0",
     "vue-router": "^4.2.5",
     "zhipuai": "^2.0.0"
@@ -45,7 +39,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.3",
     "concurrently": "^9.2.1",
-    "sass": "^1.97.1",
+    "sass-embedded": "^1.97.1",
     "vite": "^7.3.0"
   }
 }

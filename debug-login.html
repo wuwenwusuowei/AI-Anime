@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调试登录状态</title>
+</head>
+<body>
+    <h1>调试登录状态</h1>
+    <div id="debug-info"></div>
+    
+    <script>
+        // 检查登录状态
+        const token = localStorage.getItem('token');
+        const userInfo = localStorage.getItem('userInfo');
+        
+        const debugDiv = document.getElementById('debug-info');
+        debugDiv.innerHTML = `
+            <h2>当前状态：</h2>
+            <p><strong>Token:</strong> ${token ? '存在' : '不存在'}</p>
+            <p><strong>UserInfo:</strong> ${userInfo ? '存在' : '不存在'}</p>
+            <p><strong>UserInfo 内容:</strong> ${userInfo || 'null'}</p>
+            
+            <h2>操作：</h2>
+            <button onclick="setLogin()">设置登录状态</button>
+            <button onclick="goToApp()">前往应用</button>
+        `;
+        
+        function setLogin() {
+            const mockUser = {
+                id: '1',
+                username: 'testuser',
+                email: 'test@example.com',
+                avatar: '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            const mockToken = `mock-token-${Date.now()}`;
+            
+            localStorage.setItem('token', mockToken);
+            localStorage.setItem('userInfo', JSON.stringify(mockUser));
+            alert('登录状态已设置！');
+            location.reload();
+        }
+        
+        function goToApp() {
+            window.open('http://localhost:3002/', '_blank');
+        }
+    </script>
+</body>
+</html>

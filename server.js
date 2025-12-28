@@ -10,6 +10,7 @@ import FormData from 'form-data';
 import fetch from 'node-fetch';
 import { pipeline } from 'stream';
 import { promisify } from 'util';
+import sharp from 'sharp'; // 🟢 [新增] 引入强大的图片处理库
 import 'dotenv/config';
 
 const streamPipeline = promisify(pipeline);
@@ -23,7 +24,6 @@ const RESOLUTION_CONFIG = {
 };
 
 // 时长配置 (基于 16fps，公式: 秒数 * 16 + 1)
-// 显存预警：720p下超过 3秒(49帧) 容易爆显存，请注意
 const DURATION_MAP = {
     "1": 17,
     "2": 33,
@@ -37,10 +37,17 @@ const app = express();
 const prisma = new PrismaClient();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// 确保视频保存目录存在
+const videosDir = path.join(__dirname, 'public', 'videos');
+if (!fs.existsSync(videosDir)) {
+    fs.mkdirSync(videosDir, { recursive: true });
+    console.log(`📁 创建视频目录: ${videosDir}`);
+}
+
 app.use(cors());
 app.use(express.json());
 
-// 🟢 [新增] 配置静态目录，让前端能访问本地视频文件
+// 配置静态目录，让前端能访问本地视频文件
 app.use(express.static('public'));
 
 const upload = multer({ dest: 'uploads/' });
@@ -50,17 +57,30 @@ const zhipu = new OpenAI({
     baseURL: "https://open.bigmodel.cn/api/paas/v4/" 
 });
 
-// --- 2. 核心 AI 逻辑 (重写版) ---
+// --- 3. 核心 AI 逻辑 (完美修复版) ---
 
 /**
- * 视觉分析：现在要求 AI 生成一段"静态画面描述"，而不是零散的标签
+ * 视觉分析：完美处理各种图片格式 (AVIF, WebP, PNG)
+ * 1. 使用 sharp 将任意输入转为标准 JPEG
+ * 2. 处理 PNG 透明背景（防止变黑）
+ * 3. 压缩体积以加快 AI 响应
  */
 async function analyzeImageFeatures(filePath) {
-    console.log("👀 [AI视觉] 正在深度解析画面...");
+    console.log("👀 [AI视觉] 正在预处理图片并深度解析...");
     
     try {
-        const fileBuffer = fs.readFileSync(filePath);
-        const base64Image = fileBuffer.toString('base64');
+        // 🟢 [核心修改] 使用 sharp 进行标准化转换
+        const jpegBuffer = await sharp(filePath)
+            // 1. 扁平化处理：将透明背景(alpha通道)填充为白色
+            // 解决 PNG 转 JPEG 后背景变黑导致 AI 误判的问题
+            .flatten({ background: '#ffffff' }) 
+            // 2. 强制转为 JPEG，质量 90 (保留细节但兼容性最好)
+            .jpeg({ quality: 90 }) 
+            .toBuffer();
+
+        const base64Image = jpegBuffer.toString('base64');
+        
+        // 现在我们可以自信地声明这是 jpeg，不会报 400 错误了
         const dataUrl = `data:image/jpeg;base64,${base64Image}`;
 
         const response = await zhipu.chat.completions.create({
@@ -71,7 +91,6 @@ async function analyzeImageFeatures(filePath) {
                     content: [
                         { 
                             type: "text", 
-                            // 🌟 核心修改：要求生成通顺的英文段落
                             text: "请用一段通顺、客观、详细的英文描述这张图片。重点描述：人物的外貌特征（发色、服饰、五官）、人物当前的姿势、以及背景环境的细节。请使用小说式的描写手法。不要包含任何动作指令（如 running），只描述静态画面。" 
                         },
                         { type: "image_url", image_url: { url: dataUrl } }
@@ -90,12 +109,11 @@ async function analyzeImageFeatures(filePath) {
 }
 
 /**
- * 提示词生成：升级为"视觉导演"模式，构建电影感和空间感
+ * 提示词生成：视觉导演模式
  */
 async function translatePrompt(userActionText, staticDescription, style) {
     console.log(`📝 [AI编剧] 正在构建高一致性动态场景...`);
     
-    // 黄金风格后缀 (保持不变)
     let styleSuffix = "anime style, 2D, flat color, cel shading, high quality, masterpiece, 4k, vivid colors, high contrast";
     
     const systemPrompt = `你是一个精通 Wan 2.1 视频模型的"视觉导演"。
@@ -105,23 +123,12 @@ async function translatePrompt(userActionText, staticDescription, style) {
     1. 画面基础（视觉特征）：${staticDescription}
     2. 导演指令（用户动作）：${userActionText}
     
-    编写核心原则（逻辑重构）：
-    1. **环境空间构建（关键）**：
-       - 不要只写"背景是静止的"。
-       - **必须详细描述环境的空间关系**。例如："standing under a large cherry blossom tree", "school buildings in the distance", "blue sky above". 
-       - 这样当视频产生镜头运动时，模型能依据这些逻辑自然扩写背景。
-    
-    2. **动作与物理互动**：
-       - 将用户的简单指令（如"挥手"）转化为**连贯的物理动作**。
-       - 必须加入环境互动细节。例如："hair flowing in the wind", "light and shadow changing on face", "cherry petals falling around".
-    
-    3. **运镜与质感**：
-       - 除非用户明确要求静止，否则默认加入微小的运镜描述，如 "slow cinematic camera movement", "slight parallax", "depth of field".
-       - 保持人物特征（Character Consistency）绝对稳定。
-    
-    4. **结构要求**：
-       - [环境与光影] + [人物外貌与姿势] + [动作与互动] + [风格后缀]
-       - 直接输出一段通顺的英文段落。`;
+    编写核心原则：
+    1. **环境空间构建**：详细描述环境空间关系 (e.g., "standing under a large cherry blossom tree", "blue sky above")。
+    2. **动作与物理互动**：将简单指令转化为连贯动作，加入环境互动 (e.g., "hair flowing in the wind", "light and shadow changing").
+    3. **运镜与质感**：加入微小运镜 (e.g., "slow cinematic camera movement", "depth of field")。
+    4. **结构**：[环境与光影] + [人物外貌与姿势] + [动作与互动] + [风格后缀]。
+    直接输出一段通顺的英文段落。`;
 
     const completion = await zhipu.chat.completions.create({
         model: "glm-4-flash", 
@@ -134,33 +141,24 @@ async function translatePrompt(userActionText, staticDescription, style) {
 }
 
 /**
- * 功能：将云端视频下载到本地硬盘
+ * 下载云端视频到本地
  */
 async function downloadVideoToLocal(cloudUrl, filename) {
     console.log(`📥 [下载] 正在将视频搬运到本地...`);
     
     try {
-        // 1. 请求云端文件
         const response = await fetch(cloudUrl);
         if (!response.ok) throw new Error(`下载失败: ${response.statusText}`);
 
-        // 2. 确保保存路径存在
         const saveDir = path.join(__dirname, 'public', 'videos');
-        if (!fs.existsSync(saveDir)) {
-            fs.mkdirSync(saveDir, { recursive: true });
-        }
-
-        // 3. 生成本地文件名 (加个时间戳防止重名)
         const localFilename = `${Date.now()}_${filename}`;
         const localFilePath = path.join(saveDir, localFilename);
 
-        // 4. 写入硬盘
         await streamPipeline(response.body, fs.createWriteStream(localFilePath));
 
         console.log(`💾 [保存] 视频已保存至: ${localFilePath}`);
         
-        // 5. 返回本地可访问的 URL (供前端使用)
-        // 注意：这里返回的是指向你本地后端的链接
+        // 返回本地可访问的 URL
         return `http://localhost:${process.env.PORT || 3000}/videos/${localFilename}`;
     } catch (error) {
         console.error(`❌ [下载失败] ${error.message}`);
@@ -168,7 +166,7 @@ async function downloadVideoToLocal(cloudUrl, filename) {
     }
 }
 
-// --- 3. ComfyUI 工具函数 ---
+// --- 4. ComfyUI 工具函数 ---
 
 async function uploadImageToComfy(localFilePath, originalFilename) {
     console.log(`📤 [上传] 正在上传: ${originalFilename}`);
@@ -193,53 +191,36 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
     const workflowPath = path.join(__dirname, 'Image-to-Video.json');
     let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 
-    // --- ID 配置 ---
+    // --- ID 配置 (请根据实际 workflow 调整) ---
     const TEXT_NODE = "30";
     const IMAGE_NODE = "43";
-    const PAINTER_NODE = "56"; // 核心生成节点 (改分辨率 + 帧数)
-    const RESIZE_NODE = "59";  // 图片缩放节点 (改分辨率)
+    const PAINTER_NODE = "56";
+    const RESIZE_NODE = "59";
     const SAMPLER_IDS = ["38", "39"];
-    // --------------
+    // ------------------------------------
 
-    // 1. 计算参数
     const resConfig = RESOLUTION_CONFIG[resolutionKey] || RESOLUTION_CONFIG["576p"];
-    const targetFrames = DURATION_MAP[durationKey] || 49; // 默认3秒
+    const targetFrames = DURATION_MAP[durationKey] || 49;
 
     console.log(`🔧 [配置] 画质: ${resConfig.width}x${resConfig.height} | 时长: ${durationKey}s (${targetFrames}帧)`);
 
-    // 2. 修改分辨率 (Painter 和 Resize 都要改)
+    // 修改参数
     if (workflow[PAINTER_NODE]) {
         workflow[PAINTER_NODE].inputs.width = resConfig.width;
         workflow[PAINTER_NODE].inputs.height = resConfig.height;
-        workflow[PAINTER_NODE].inputs.length = targetFrames; // <--- 修改总帧数
+        workflow[PAINTER_NODE].inputs.length = targetFrames;
     }
     if (workflow[RESIZE_NODE]) {
         workflow[RESIZE_NODE].inputs.width = resConfig.width;
         workflow[RESIZE_NODE].inputs.height = resConfig.height;
     }
+    if (workflow[TEXT_NODE]) workflow[TEXT_NODE].inputs.text = positivePrompt;
+    if (workflow[IMAGE_NODE]) workflow[IMAGE_NODE].inputs.image = cloudImageName;
 
-    // 3. 注入提示词、图片、种子 (保持原逻辑)
-    if (workflow[TEXT_NODE]) {
-        workflow[TEXT_NODE].inputs.text = positivePrompt;
-    } else {
-        throw new Error(`找不到提示词节点 ID: ${TEXT_NODE}`);
-    }
-
-    if (workflow[IMAGE_NODE]) {
-        workflow[IMAGE_NODE].inputs.image = cloudImageName;
-    } else {
-        throw new Error(`找不到图片节点 ID: ${IMAGE_NODE}`);
-    }
-
-    // 注入随机种子 (同时给两个采样器赋值)
+    // 随机种子
     const randomSeed = Math.floor(Math.random() * 1000000000000);
-    
     SAMPLER_IDS.forEach(id => {
-        if (workflow[id]) {
-            workflow[id].inputs.noise_seed = randomSeed;
-        } else {
-            console.warn(`⚠️ 警告: 找不到采样器节点 ID ${id}`);
-        }
+        if (workflow[id]) workflow[id].inputs.noise_seed = randomSeed;
     });
 
     console.log(`🚀 [触发] 发送任务... 种子: ${randomSeed}`);
@@ -255,110 +236,67 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
     return data.prompt_id;
 }
 
-// --- 4. API 路由 ---
+// --- 5. API 路由 ---
 
-// 用户注册
+// 用户相关接口
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
+        if (!username || !email || !password) return res.status(400).json({ error: '请填写完整信息' });
         
-        if (!username || !email || !password) {
-            return res.status(400).json({ error: '请填写完整信息' });
-        }
-
-        // 检查邮箱是否已存在
         const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
-            return res.status(400).json({ error: '邮箱已被注册' });
-        }
+        if (existingUser) return res.status(400).json({ error: '邮箱已被注册' });
 
-        // 创建用户（密码实际应该加密，这里简化处理）
-        const user = await prisma.user.create({
-            data: { username, email, password }
-        });
-
-        // 生成token（简化版）
+        const user = await prisma.user.create({ data: { username, email, password } });
         const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
 
-        res.json({
-            success: true,
-            token,
-            user: { id: user.id, username: user.username, email: user.email }
-        });
+        res.json({ success: true, token, user: { id: user.id, username: user.username, email: user.email } });
     } catch (error) {
-        console.error('Register error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 用户登录
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        if (!email || !password) return res.status(400).json({ error: '请填写完整信息' });
 
-        if (!email || !password) {
-            return res.status(400).json({ error: '请填写完整信息' });
-        }
-
-        // 查找用户
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-            return res.status(401).json({ error: '邮箱或密码错误' });
-        }
+        if (!user || user.password !== password) return res.status(401).json({ error: '邮箱或密码错误' });
 
-        // 验证密码（简化版，实际应该用bcrypt）
-        if (user.password !== password) {
-            return res.status(401).json({ error: '邮箱或密码错误' });
-        }
-
-        // 生成token
         const token = Buffer.from(`${user.id}:${user.email}`).toString('base64');
-
-        res.json({
-            success: true,
-            token,
-            user: { id: user.id, username: user.username, email: user.email }
-        });
+        res.json({ success: true, token, user: { id: user.id, username: user.username, email: user.email } });
     } catch (error) {
-        console.error('Login error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 检查token验证（简化版）
 app.get('/api/auth/me', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
-        if (!authHeader) {
-            return res.status(401).json({ error: '未授权' });
-        }
+        if (!authHeader) return res.status(401).json({ error: '未授权' });
 
         const token = authHeader.replace('Bearer ', '');
         const decoded = Buffer.from(token, 'base64').toString('utf-8');
         const [userId, email] = decoded.split(':');
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || user.id.toString() !== userId) {
-            return res.status(401).json({ error: 'token无效' });
-        }
+        if (!user || user.id.toString() !== userId) return res.status(401).json({ error: 'token无效' });
 
-        res.json({
-            success: true,
-            user: { id: user.id, username: user.username, email: user.email }
-        });
+        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
+// 生成任务接口
 app.post('/api/generate', upload.single('image'), async (req, res) => {
     try {
-        // 从 body 获取参数
         const { prompt, resolution, duration } = req.body;
         const file = req.file;
         if (!file) return res.status(400).json({ error: "请上传图片" });
 
-        console.log(`\n🆕 收到新任务: ${prompt}, 画质: ${resolution}, 时长: ${duration}s, 图片: ${file.originalname}`);
+        console.log(`\n🆕 收到新任务: ${prompt}, 画质: ${resolution}, 时长: ${duration}s`);
 
         const task = await prisma.videoTask.create({
             data: { userPrompt: prompt || "动态视频", style: 'anime', status: 'PENDING' }
@@ -366,20 +304,21 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
 
         res.json({ success: true, taskId: task.id });
 
+        // 异步执行任务
         (async () => {
             try {
-                // A. 上传图片
+                // A. 上传图片到 ComfyUI
                 const cloudFileName = await uploadImageToComfy(file.path, file.originalname);
                 
-                // B. 视觉分析 (生成静态描述)
+                // B. 视觉分析 (已增强兼容性)
                 const staticDesc = await analyzeImageFeatures(file.path);
                 
-                // C. 提示词融合 (静态 + 动作 + 风格)
+                // C. 提示词融合
                 const finalPrompt = await translatePrompt(prompt || "natural movement", staticDesc, 'anime');
                 
                 await prisma.videoTask.update({ where: { id: task.id }, data: { translatedPrompt: finalPrompt } });
 
-                // D. 触发任务
+                // D. 触发 ComfyUI
                 const promptId = await triggerComfyUI(finalPrompt, cloudFileName, resolution, duration);
                 
                 await prisma.videoTask.update({ where: { id: task.id }, data: { status: 'PROCESSING', promptId: promptId } });
@@ -388,6 +327,7 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
                 console.error("❌ 任务失败:", err);
                 await prisma.videoTask.update({ where: { id: task.id }, data: { status: 'FAILED' } });
             } finally {
+                // 清理上传的临时文件
                 if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
             }
         })();
@@ -396,7 +336,7 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
     }
 });
 
-// 查询接口 (保持之前的 MP4/Subfolder 解析逻辑)
+// 状态查询接口
 app.get('/api/status/:id', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
@@ -417,16 +357,15 @@ app.get('/api/status/:id', async (req, res) => {
                     let subfolder = "";
                     let type = "output";
 
+                    // 遍历寻找视频文件
                     for (const nodeId in outputs) {
                         const nodeOutput = outputs[nodeId];
-                        // 优先找 MP4
                         if (nodeOutput.videos && nodeOutput.videos.length > 0) {
                             filename = nodeOutput.videos[0].filename;
                             subfolder = nodeOutput.videos[0].subfolder;
                             type = nodeOutput.videos[0].type;
                             break;
                         }
-                        // 兼容 GIF
                         if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
                             filename = nodeOutput.gifs[0].filename;
                             subfolder = nodeOutput.gifs[0].subfolder;
@@ -442,20 +381,17 @@ app.get('/api/status/:id', async (req, res) => {
                         params.append("type", type);
                         if (subfolder) params.append("subfolder", subfolder);
 
-                        // 这是云端的临时链接 (稍后会失效)
                         const cloudUrl = `${baseUrl}/view?${params.toString()}`;
-                        console.log("☁️ 云端临时地址:", cloudUrl);
+                        console.log("☁️ 发现云端视频，准备下载...");
 
-                        // 🟢 [新增核心逻辑] 下载到本地！
-                        let finalUrl = cloudUrl; // 默认先用云端的
+                        // 下载并保存到本地
+                        let finalUrl = cloudUrl; 
                         try {
-                            // 调用下载函数，把云端链接变成本地链接
                             finalUrl = await downloadVideoToLocal(cloudUrl, filename);
                         } catch (downloadErr) {
-                            console.error("⚠️ 下载到本地失败，将使用云端链接:", downloadErr.message);
+                            console.error("⚠️ 下载失败，回退到云端链接");
                         }
 
-                        // 更新数据库 (存的是永久有效的本地链接)
                         await prisma.videoTask.update({
                             where: { id: task.id },
                             data: { status: 'COMPLETED', videoUrl: finalUrl }
@@ -465,7 +401,7 @@ app.get('/api/status/:id', async (req, res) => {
                     }
                 }
             } catch (e) {
-                // 忽略网络抖动
+                // ComfyUI 还没返回结果，继续等待
             }
         }
         res.json({ status: task.status, videoUrl: task.videoUrl });
@@ -473,13 +409,6 @@ app.get('/api/status/:id', async (req, res) => {
         res.status(500).json({error: e.message});
     }
 });
-
-// 确保视频保存目录存在
-const videosDir = path.join(__dirname, 'public', 'videos');
-if (!fs.existsSync(videosDir)) {
-    fs.mkdirSync(videosDir, { recursive: true });
-    console.log(`📁 创建视频目录: ${videosDir}`);
-}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

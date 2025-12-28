@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动登录设置</title>
+</head>
+<body>
+    <h1>正在设置模拟登录状态...</h1>
+    
+    <script>
+        // 模拟用户登录状态
+        const mockUser = {
+            id: '1',
+            username: 'testuser',
+            email: 'test@example.com',
+            avatar: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        const mockToken = `mock-token-${Date.now()}`;
+
+        // 保存到 localStorage
+        localStorage.setItem('token', mockToken);
+        localStorage.setItem('userInfo', JSON.stringify(mockUser));
+
+        console.log('✅ 模拟登录成功！');
+        console.log('Token:', mockToken);
+        console.log('User:', mockUser);
+        
+        // 立即跳转到前端应用
+        window.location.href = 'http://127.0.0.1:3002/';
+    </script>
+</body>
+</html>

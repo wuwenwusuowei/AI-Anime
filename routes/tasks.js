@@ -1,5 +1,6 @@
-const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -7,10 +8,10 @@ const prisma = new PrismaClient();
 router.get('/', async (req, res) => {
   try {
     const { userId, status } = req.query;
-    
+
     const where = userId ? { userId } : {};
     if (status) where.status = status;
-    
+
     const tasks = await prisma.videoTask.findMany({
       where,
       include: {
@@ -95,14 +96,17 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, videoUrl, promptId } = req.body;
-    
+    const { status, videoUrl, promptId, resultUrl, refImageBody, refImageFace } = req.body;
+
     const updateData = {
       ...(status && { status }),
       ...(videoUrl && { videoUrl }),
-      ...(promptId && { promptId })
+      ...(promptId && { promptId }),
+      ...(resultUrl && { resultUrl }),
+      ...(refImageBody && { refImageBody }),
+      ...(refImageFace && { refImageFace })
     };
-    
+
     const task = await prisma.videoTask.update({
       where: { id: parseInt(id) },
       data: updateData,
@@ -116,9 +120,9 @@ router.patch('/:id', async (req, res) => {
       }
     });
 
-    res.json({ 
+    res.json({
       message: 'Task updated successfully',
-      task 
+      task
     });
   } catch (error) {
     console.error('Error updating task:', error);
@@ -126,4 +130,20 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+// Delete a task
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.videoTask.delete({
+      where: { id: parseInt(id) }
+    });
+
+    res.json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+export default router;

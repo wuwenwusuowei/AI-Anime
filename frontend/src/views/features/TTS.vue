@@ -165,8 +165,8 @@
 
         <!-- 操作按钮 -->
         <div class="actions-section">
-          <el-button 
-            type="primary" 
+          <el-button
+            type="primary"
             size="large"
             :loading="generating"
             :disabled="!canGenerate"
@@ -176,8 +176,8 @@
             <el-icon><Microphone /></el-icon>
             {{ generating ? '生成中...' : '生成语音' }}
           </el-button>
-          
-          <el-button 
+
+          <el-button
             v-if="audioUrl"
             @click="downloadAudio"
             size="large"
@@ -187,7 +187,7 @@
             下载音频
           </el-button>
 
-          <el-button 
+          <el-button
             @click="previewAudio"
             v-if="audioUrl"
             size="large"
@@ -195,6 +195,16 @@
           >
             <el-icon><VideoPlay /></el-icon>
             预览
+          </el-button>
+
+          <el-button
+            v-if="audioUrl"
+            type="danger"
+            size="large"
+            @click="handleClearAll"
+            class="clear-btn"
+          >
+            清除所有
           </el-button>
         </div>
 
@@ -220,9 +230,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Microphone, Download, VideoPlay } from '@element-plus/icons-vue'
+import { Microphone, Download, VideoPlay, Delete } from '@element-plus/icons-vue'
 
 // 响应式数据
 const generating = ref(false)
@@ -245,6 +255,64 @@ const ttsForm = reactive({
 const voiceTypes = ref([
   // 默认音色，将在 onMounted 时动态加载
 ])
+
+// === 状态持久化 ===
+// 从 localStorage 加载状态
+const loadState = () => {
+  try {
+    const saved = localStorage.getItem('tts_state')
+    if (saved) {
+      const state = JSON.parse(saved)
+      ttsForm.text = state.text || ''
+      ttsForm.voiceType = state.voiceType || 'female-shaonv'
+      ttsForm.language = state.language || 'zh-CN'
+      ttsForm.speed = state.speed || 1.0
+      ttsForm.volume = state.volume || 80
+      ttsForm.outputFormat = state.outputFormat || 'mp3'
+      audioUrl.value = state.audioUrl || ''
+      audioDuration.value = state.audioDuration || 0
+      audioSize.value = state.audioSize || ''
+    }
+  } catch (e) {
+    console.error('加载状态失败:', e)
+  }
+}
+
+// 保存状态到 localStorage
+const saveState = () => {
+  try {
+    const state = {
+      text: ttsForm.text,
+      voiceType: ttsForm.voiceType,
+      language: ttsForm.language,
+      speed: ttsForm.speed,
+      volume: ttsForm.volume,
+      outputFormat: ttsForm.outputFormat,
+      audioUrl: audioUrl.value,
+      audioDuration: audioDuration.value,
+      audioSize: audioSize.value
+    }
+    localStorage.setItem('tts_state', JSON.stringify(state))
+  } catch (e) {
+    console.error('保存状态失败:', e)
+  }
+}
+
+// 清除状态
+const clearState = () => {
+  localStorage.removeItem('tts_state')
+}
+
+// 监听状态变化并保存
+watch([ttsForm, audioUrl, audioDuration, audioSize], () => {
+  saveState()
+}, { deep: true })
+
+// 组件挂载时加载状态
+onMounted(() => {
+  loadVoiceTypes()
+  loadState()
+})
 
 // 加载音色列表
 const loadVoiceTypes = async () => {
@@ -357,6 +425,7 @@ const generateTTS = async () => {
 
   generating.value = true
   audioUrl.value = ''
+  saveState() // 保存初始状态
 
   try {
     const response = await fetch('/api/tts/generate', {
@@ -371,6 +440,7 @@ const generateTTS = async () => {
       const result = await response.json()
       if (result.success) {
         audioUrl.value = result.audioUrl
+        saveState() // 保存结果URL
         ElMessage.success('语音生成成功！')
       } else {
         // 检查是否是余额不足错误
@@ -381,13 +451,14 @@ const generateTTS = async () => {
             duration: 5000,
             showClose: true
           })
-          
+
           // 模拟生成成功（用于演示界面功能）
           setTimeout(() => {
             // 创建一个简单的音频URL用于演示
             audioUrl.value = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH3/PaSwUOYLLjt6qNVGwlBlefw8uKVNCzNj2/LTcqUEGWXrzi0q6AWBQd0pWHf2IaVDnBh1ypXxsByGjx4r1VVKyNWz/UrqyJQxzYg9Bysk3LQo1YcA8MpDVuQScyrgYAQ3MeivLVK2C02Ldqu7WAbu8PWj7s1iBaOS8siPW5+CswR2o5qFeiwGjlq56vW1zJNzt6N3Y0ysx'
             audioDuration.value = estimatedDuration.value
             audioSize.value = Math.ceil(estimatedDuration.value * 32) + ' KB'
+            saveState() // 保存模拟结果
             ElMessage.success('演示音频生成成功（模拟数据）')
             generating.value = false
           }, 1500)
@@ -403,6 +474,7 @@ const generateTTS = async () => {
     ElMessage.error(`TTS生成失败: ${error.message}`)
   } finally {
     generating.value = false
+    saveState() // 保存生成状态
   }
 }
 
@@ -414,15 +486,58 @@ const previewAudio = () => {
 }
 
 // 下载音频
-const downloadAudio = () => {
+const downloadAudio = async () => {
   if (audioUrl.value) {
-    const link = document.createElement('a')
-    link.href = audioUrl.value
-    link.download = `tts_${Date.now()}.${ttsForm.outputFormat}`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    try {
+      const timestamp = Date.now()
+      const filename = `tts_${timestamp}.${ttsForm.outputFormat}`
+
+      // 使用 fetch 获取音频数据
+      const response = await fetch(audioUrl.value)
+      if (!response.ok) {
+        throw new Error('获取音频失败')
+      }
+
+      // 转换为 blob
+      const blob = await response.blob()
+
+      // 创建临时 URL
+      const url = window.URL.createObjectURL(blob)
+
+      // 创建下载链接
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+
+      // 添加到 DOM，触发下载
+      document.body.appendChild(link)
+      link.click()
+
+      // 清理
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      ElMessage.success('下载已开始')
+    } catch (err: any) {
+      console.error('下载失败:', err)
+      ElMessage.error('下载失败: ' + err.message)
+    }
   }
+}
+
+// 清除所有状态
+const handleClearAll = () => {
+  clearState()
+  ttsForm.text = ''
+  ttsForm.voiceType = 'female-shaonv'
+  ttsForm.language = 'zh-CN'
+  ttsForm.speed = 1.0
+  ttsForm.volume = 80
+  ttsForm.outputFormat = 'mp3'
+  audioUrl.value = ''
+  audioDuration.value = 0
+  audioSize.value = ''
+  ElMessage.success('已清除所有数据')
 }
 
 // 音频加载完成
@@ -757,7 +872,7 @@ onMounted(() => {
   margin-bottom: 30px;
   padding: 20px 0;
   border-top: 1px solid var(--border-light);
-  
+
   .generate-btn {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
@@ -767,12 +882,12 @@ onMounted(() => {
     font-weight: 600;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    
+
     &:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
     }
-    
+
     &:disabled {
       background: var(--border-light);
       color: var(--text-secondary);
@@ -780,14 +895,15 @@ onMounted(() => {
       transform: none;
     }
   }
-  
+
   .download-btn,
-  .preview-btn {
+  .preview-btn,
+  .clear-btn {
     height: 45px;
     min-width: 100px;
     border-radius: 8px;
     font-weight: 600;
-    
+
     &:hover {
       transform: translateY(-2px);
     }

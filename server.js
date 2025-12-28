@@ -36,11 +36,68 @@ const DURATION_MAP = {
     "5": 81
 };
 
+// Flux 画幅映射
+const ASPECT_RATIOS = {
+    "1:1": { width: 1024, height: 1024 },
+    "9:16": { width: 832, height: 1216 }, // 竖屏 (最佳分镜比例)
+    "16:9": { width: 1216, height: 832 }, // 横屏
+    "3:4": { width: 896, height: 1152 }
+};
+
+// --- 风格配置表 (基于用户指定文件) ---
+const STYLE_MAP = {
+    "default": {
+        name: "默认风格",
+        lora: null,
+        strength: 0,
+        prompt_suffix: ""
+    },
+    "guofeng": {
+        name: "国风少女",
+        lora: "国风么女图.safetensors",
+        strength: 0.8,
+        prompt_suffix: ", traditional chinese style, ink wash painting, hanfu, elegant, masterpiece"
+    },
+    "ai_anime": {
+        name: "AI动漫风格",
+        lora: "Anime_Arts.safetensors",
+        strength: 0.8,
+        prompt_suffix: ", anime arts style, digital art, highly detailed, vibrant colors"
+    },
+    "stained_glass": {
+        name: "彩绘玻璃",
+        lora: "anime_stained_glass_v1.0.safetensors",
+        strength: 0.7,
+        prompt_suffix: ", stained glass style, mosaic, bold outlines, transparent texture"
+    },
+    "japan_anime": {
+        name: "日漫风格",
+        lora: "Anime_styler_v1.safetensors",
+        strength: 0.8,
+        prompt_suffix: ", japanese anime style, flat color, cel shading, clean lines"
+    },
+    "screencap": {
+        name: "动漫截图",
+        lora: "animescreencap_flux_v1_2000.safetensors",
+        strength: 0.7,
+        prompt_suffix: ", anime screencap, retro anime style, 90s anime, broadcast quality"
+    },
+    "semi_real": {
+        name: "半写实风",
+        lora: "Flux__Semi-realistic_art_style-000004.safetensors",
+        strength: 0.7,
+        prompt_suffix: ", semi-realistic, 2.5D, depth of field, detailed skin texture, soft lighting"
+    },
+    "3d_anime": {
+        name: "3D AI动漫",
+        lora: "hinaFluxAnimeStyle_v3.safetensors",
+        strength: 0.75,
+        prompt_suffix: ", 3d render style, cgi, blender, unreal engine, volumetric lighting"
+    }
+};
+
 // --- 2. 基础配置 ---
 const app = express();
-
-// 强制设置数据库URL为SQLite
-process.env.DATABASE_URL = 'file:./prisma/dev.db';
 
 const prisma = new PrismaClient();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -188,25 +245,37 @@ async function translatePrompt(userActionText, staticDescription, style) {
 }
 
 /**
- * 下载云端视频到本地
+ * 下载云端文件到本地（通用函数，支持图片和视频）
  */
-async function downloadVideoToLocal(cloudUrl, filename) {
-    console.log(`📥 [下载] 正在将视频搬运到本地...`);
-    
+async function downloadFileToLocal(cloudUrl, filename, type = "output") {
+    // 根据文件类型判断保存目录
+    const isImage = filename.match(/\.(png|jpg|jpeg|webp|gif)$/i);
+    const saveDir = isImage
+        ? path.join(__dirname, 'public', 'images')
+        : path.join(__dirname, 'public', 'videos');
+
+    // 确保目录存在
+    if (!fs.existsSync(saveDir)) {
+        fs.mkdirSync(saveDir, { recursive: true });
+        console.log(`📁 创建目录: ${saveDir}`);
+    }
+
+    console.log(`📥 [下载] 正在将${isImage ? '图片' : '视频'}搬运到本地...`);
+
     try {
         const response = await fetch(cloudUrl);
         if (!response.ok) throw new Error(`下载失败: ${response.statusText}`);
 
-        const saveDir = path.join(__dirname, 'public', 'videos');
         const localFilename = `${Date.now()}_${filename}`;
         const localFilePath = path.join(saveDir, localFilename);
 
         await streamPipeline(response.body, fs.createWriteStream(localFilePath));
 
-        console.log(`💾 [保存] 视频已保存至: ${localFilePath}`);
-        
+        console.log(`💾 [保存] ${isImage ? '图片' : '视频'}已保存至: ${localFilePath}`);
+
         // 返回本地可访问的 URL
-        return `http://localhost:${process.env.PORT || 3000}/videos/${localFilename}`;
+        const relativePath = isImage ? 'images' : 'videos';
+        return `http://localhost:${process.env.PORT || 3000}/${relativePath}/${localFilename}`;
     } catch (error) {
         console.error(`❌ [下载失败] ${error.message}`);
         throw error;
@@ -232,6 +301,103 @@ async function uploadImageToComfy(localFilePath, originalFilename) {
     } catch (error) {
         throw new Error(`连接失败: ${error.message}`);
     }
+}
+
+// Flux 文生图触发函数
+async function triggerTxt2Img(prompt, ratio = "9:16", styleKey = "default") {
+    console.log(`🎨 [Flux 文生图] 开始生成...`);
+    const workflowPath = path.join(__dirname, 'Flux_Txt2Img_API.json');
+    let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+
+    // 节点 ID 配置
+    const PROMPT_NODE = "2";
+    const SEED_NODE = "5";
+    const RESOLUTION_NODE = "4";
+    const LORA_NODE = "10";
+
+    // 获取风格配置
+    const styleConfig = STYLE_MAP[styleKey] || STYLE_MAP["default"];
+    const ratioConfig = ASPECT_RATIOS[ratio] || ASPECT_RATIOS["9:16"];
+    const seed = Math.floor(Math.random() * 1000000000000);
+
+    // 追加风格提示词后缀
+    const finalPrompt = prompt + styleConfig.prompt_suffix;
+
+    console.log(`🔧 [配置] 风格: ${styleConfig.name} (${styleKey})`);
+    console.log(`🔧 [配置] 提示词: ${finalPrompt.substring(0, 50)}... | 画幅: ${ratio} (${ratioConfig.width}x${ratioConfig.height})`);
+
+    // 修改参数
+    workflow[PROMPT_NODE].inputs.text = finalPrompt;
+    workflow[SEED_NODE].inputs.seed = seed;
+    workflow[RESOLUTION_NODE].inputs.width = ratioConfig.width;
+    workflow[RESOLUTION_NODE].inputs.height = ratioConfig.height;
+
+    // 设置 LoRA 参数
+    if (styleConfig.lora && workflow[LORA_NODE]) {
+        workflow[LORA_NODE].inputs.lora_name = styleConfig.lora;
+        workflow[LORA_NODE].inputs.strength_model = styleConfig.strength;
+        workflow[LORA_NODE].inputs.strength_clip = 1;
+        console.log(`🎭 [LoRA] 加载风格: ${styleConfig.lora}, 强度: ${styleConfig.strength}`);
+    } else {
+        // 默认风格，跳过 LoRA 或设置强度为 0
+        if (workflow[LORA_NODE]) {
+            workflow[LORA_NODE].inputs.strength_model = 0;
+            workflow[LORA_NODE].inputs.strength_clip = 0;
+            console.log(`🎭 [LoRA] 使用默认风格，不加载 LoRA`);
+        }
+    }
+
+    console.log(`🚀 [触发] 发送文生图任务... 种子: ${seed}`);
+
+    const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: workflow })
+    });
+
+    if (!response.ok) throw new Error(`ComfyUI Error: ${response.statusText}`);
+    const data = await response.json();
+    return data.prompt_id;
+}
+
+// Flux 图生图触发函数 (Redux + PuLID)
+async function triggerImg2Img(prompt, ratio = "9:16", bodyFileName, faceFileName) {
+    console.log(`🎨 [Flux 图生图] 开始生成...`);
+    const workflowPath = path.join(__dirname, 'Flux_Img2Img_API.json');
+    let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+
+    // 节点 ID 配置
+    const PROMPT_NODE = "2";
+    const SEED_NODE = "5";
+    const RESOLUTION_NODE = "4";
+    const BODY_IMAGE_NODE = "13"; // Redux 参考图 (全身)
+    const FACE_IMAGE_NODE = "24"; // PuLID 参考图 (脸部)
+
+    const ratioConfig = ASPECT_RATIOS[ratio] || ASPECT_RATIOS["9:16"];
+    const seed = Math.floor(Math.random() * 1000000000000);
+
+    console.log(`🔧 [配置] 提示词: ${prompt.substring(0, 50)}... | 画幅: ${ratio} (${ratioConfig.width}x${ratioConfig.height})`);
+    console.log(`📷 [参考图] 全身: ${bodyFileName} | 脸部: ${faceFileName}`);
+
+    // 修改参数
+    workflow[PROMPT_NODE].inputs.text = prompt;
+    workflow[SEED_NODE].inputs.seed = seed;
+    workflow[RESOLUTION_NODE].inputs.width = ratioConfig.width;
+    workflow[RESOLUTION_NODE].inputs.height = ratioConfig.height;
+    workflow[BODY_IMAGE_NODE].inputs.image = bodyFileName;
+    workflow[FACE_IMAGE_NODE].inputs.image = faceFileName;
+
+    console.log(`🚀 [触发] 发送图生图任务... 种子: ${seed}`);
+
+    const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: workflow })
+    });
+
+    if (!response.ok) throw new Error(`ComfyUI Error: ${response.statusText}`);
+    const data = await response.json();
+    return data.prompt_id;
 }
 
 async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "576p", durationKey = "3") {
@@ -876,7 +1042,122 @@ app.get('/api/auth/me', async (req, res) => {
     }
 });
 
-// 生成任务接口
+// Flux 文生图接口
+app.post('/api/generate/txt2img', async (req, res) => {
+    try {
+        const { prompt, ratio, style } = req.body;
+
+        if (!prompt) {
+            return res.status(400).json({ error: "请提供提示词" });
+        }
+
+        console.log(`\n🆕 Flux 文生图任务: ${prompt}, 画幅: ${ratio || '9:16'}, 风格: ${style || 'default'}`);
+
+        const task = await prisma.videoTask.create({
+            data: {
+                userPrompt: prompt,
+                type: 'TXT2IMG',
+                status: 'PENDING',
+                style: style || 'default'
+            }
+        });
+
+        res.json({ success: true, taskId: task.id });
+
+        // 异步执行任务
+        (async () => {
+            try {
+                const promptId = await triggerTxt2Img(prompt, ratio || '9:16', style || 'default');
+
+                await prisma.videoTask.update({
+                    where: { id: task.id },
+                    data: { status: 'PROCESSING', promptId: promptId }
+                });
+
+                console.log(`✅ [文生图] 任务 ${task.id} 已发送到 ComfyUI`);
+            } catch (err) {
+                console.error(`❌ [文生图] 任务 ${task.id} 失败:`, err.message);
+                await prisma.videoTask.update({
+                    where: { id: task.id },
+                    data: { status: 'FAILED' }
+                });
+            }
+        })();
+    } catch (error) {
+        console.error('文生图任务创建失败:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Flux 图生图接口 (Redux + PuLID)
+app.post('/api/generate/img2img', upload.fields([
+    { name: 'imageBody', maxCount: 1 },
+    { name: 'imageFace', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        const { prompt, ratio } = req.body;
+        const bodyFile = req.files?.imageBody?.[0];
+        const faceFile = req.files?.imageFace?.[0];
+
+        if (!bodyFile || !faceFile) {
+            return res.status(400).json({ error: "请上传全身参考图和脸部参考图" });
+        }
+
+        if (!prompt) {
+            return res.status(400).json({ error: "请提供提示词" });
+        }
+
+        console.log(`\n🆕 Flux 图生图任务: ${prompt}, 画幅: ${ratio || '9:16'}`);
+
+        const task = await prisma.videoTask.create({
+            data: {
+                userPrompt: prompt,
+                type: 'IMG2IMG',
+                status: 'PENDING',
+                refImageBody: bodyFile.path,
+                refImageFace: faceFile.path
+            }
+        });
+
+        res.json({ success: true, taskId: task.id });
+
+        // 异步执行任务
+        (async () => {
+            try {
+                // 上传两张参考图到 ComfyUI
+                const bodyCloudName = await uploadImageToComfy(bodyFile.path, bodyFile.originalname);
+                const faceCloudName = await uploadImageToComfy(faceFile.path, faceFile.originalname);
+
+                const promptId = await triggerImg2Img(prompt, ratio || '9:16', bodyCloudName, faceCloudName);
+
+                await prisma.videoTask.update({
+                    where: { id: task.id },
+                    data: { status: 'PROCESSING', promptId: promptId }
+                });
+
+                console.log(`✅ [图生图] 任务 ${task.id} 已发送到 ComfyUI`);
+
+                // 清理上传的临时文件
+                if (fs.existsSync(bodyFile.path)) fs.unlinkSync(bodyFile.path);
+                if (fs.existsSync(faceFile.path)) fs.unlinkSync(faceFile.path);
+            } catch (err) {
+                console.error(`❌ [图生图] 任务 ${task.id} 失败:`, err.message);
+                await prisma.videoTask.update({
+                    where: { id: task.id },
+                    data: { status: 'FAILED' }
+                });
+                // 清理临时文件
+                if (fs.existsSync(bodyFile.path)) fs.unlinkSync(bodyFile.path);
+                if (fs.existsSync(faceFile.path)) fs.unlinkSync(faceFile.path);
+            }
+        })();
+    } catch (error) {
+        console.error('图生图任务创建失败:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 生成任务接口 (原有的图生视频)
 app.post('/api/generate', upload.single('image'), async (req, res) => {
     try {
         // 调试信息
@@ -934,34 +1215,47 @@ app.get('/api/status/:id', async (req, res) => {
         const taskId = parseInt(req.params.id);
         const task = await prisma.videoTask.findUnique({ where: { id: taskId } });
         if (!task) return res.status(404).json({ error: "任务不存在" });
-        if (task.status === 'COMPLETED') return res.json({ status: 'COMPLETED', videoUrl: task.videoUrl });
+        if (task.status === 'COMPLETED') return res.json({ status: 'COMPLETED', resultUrl: task.resultUrl || task.videoUrl, type: task.type });
 
         if (task.status === 'PROCESSING' && task.promptId) {
             try {
                 const historyRes = await fetch(`${process.env.COMFY_API_URL}/history/${task.promptId}`);
                 const historyData = await historyRes.json();
-                
+
                 if (historyData[task.promptId]) {
                     console.log("🏁 任务完成，正在解析...");
                     const outputs = historyData[task.promptId].outputs;
-                    
+
                     let filename = null;
                     let subfolder = "";
                     let type = "output";
 
-                    // 遍历寻找视频文件
+                    // 遍历寻找结果文件（图片或视频）
                     for (const nodeId in outputs) {
                         const nodeOutput = outputs[nodeId];
-                        if (nodeOutput.videos && nodeOutput.videos.length > 0) {
+
+                        // 1. 先尝试找 images (文生图/图生图的结果)
+                        if (nodeOutput.images && nodeOutput.images.length > 0) {
+                            filename = nodeOutput.images[0].filename;
+                            subfolder = nodeOutput.images[0].subfolder;
+                            type = nodeOutput.images[0].type;
+                            console.log(`🖼️ 发现图片结果: ${filename}`);
+                            break;
+                        }
+                        // 2. 再尝试找 videos (图生视频的结果)
+                        else if (nodeOutput.videos && nodeOutput.videos.length > 0) {
                             filename = nodeOutput.videos[0].filename;
                             subfolder = nodeOutput.videos[0].subfolder;
                             type = nodeOutput.videos[0].type;
+                            console.log(`🎬 发现视频结果: ${filename}`);
                             break;
                         }
-                        if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
+                        // 3. 再尝试找 gifs
+                        else if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
                             filename = nodeOutput.gifs[0].filename;
                             subfolder = nodeOutput.gifs[0].subfolder;
                             type = nodeOutput.gifs[0].type;
+                            console.log(`🎬 发现GIF结果: ${filename}`);
                             break;
                         }
                     }
@@ -974,29 +1268,34 @@ app.get('/api/status/:id', async (req, res) => {
                         if (subfolder) params.append("subfolder", subfolder);
 
                         const cloudUrl = `${baseUrl}/view?${params.toString()}`;
-                        console.log("☁️ 发现云端视频，准备下载...");
+                        console.log("☁️ 发现云端文件，准备下载...");
 
                         // 下载并保存到本地
-                        let finalUrl = cloudUrl; 
+                        let finalUrl = cloudUrl;
                         try {
-                            finalUrl = await downloadVideoToLocal(cloudUrl, filename);
+                            finalUrl = await downloadFileToLocal(cloudUrl, filename, type);
                         } catch (downloadErr) {
                             console.error("⚠️ 下载失败，回退到云端链接");
                         }
 
+                        // 更新任务状态
                         await prisma.videoTask.update({
                             where: { id: task.id },
-                            data: { status: 'COMPLETED', videoUrl: finalUrl }
+                            data: {
+                                status: 'COMPLETED',
+                                resultUrl: finalUrl,
+                                videoUrl: finalUrl // 向后兼容
+                            }
                         });
-                        
-                        return res.json({ status: 'COMPLETED', videoUrl: finalUrl });
+
+                        return res.json({ status: 'COMPLETED', resultUrl: finalUrl, type: task.type });
                     }
                 }
             } catch (e) {
                 // ComfyUI 还没返回结果，继续等待
             }
         }
-        res.json({ status: task.status, videoUrl: task.videoUrl });
+        res.json({ status: task.status, resultUrl: task.resultUrl || task.videoUrl, type: task.type });
     } catch (e) {
         res.status(500).json({error: e.message});
     }

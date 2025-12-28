@@ -4,10 +4,10 @@
     <div class="hero-section">
       <div class="hero-content">
       <h1 class="hero-title">AI-Anime漫改视频</h1>
-      <p class="hero-subtitle">AI动态漫画视频生成平台，让创意变为现实</p>
+      <p class="hero-subtitle">从文字到完整动漫视频的一站式创作平台</p>
         <p class="hero-description">
-          通过先进的生成式AI技术，将您的文字描述转换为精美的动态漫画作品，
-          无需专业绘画技能，人人都能成为漫画创作者
+          智能文生图创作人物形象，图生图完成分镜设计，图生视频生成动漫片段，
+          文字转语音添加配音。无需专业技能，轻松打造你的动漫作品
         </p>
       </div>
     </div>
@@ -20,10 +20,23 @@
             <el-icon><EditPen /></el-icon>
           </div>
         </div>
-        <h3 class="feature-title">智能文字解析</h3>
+        <h3 class="feature-title">文生图</h3>
         <p class="feature-description">
-          支持自然语言文字输入，AI智能解析角色特征、场景信息、动作指令和情感倾向，
-          精准还原您的创作构思
+          根据文字描述生成高质量人物图像，支持8种风格选择（国风、日漫、3D动漫等），
+          精准还原角色特征，创作独特的人物形象
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><Crop /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">图生图</h3>
+        <p class="feature-description">
+          在文生图生成的人物基础上进行分镜制作，创作连贯的动漫场景，
+          保持角色一致性，完成故事情节的分镜设计
         </p>
       </div>
 
@@ -33,10 +46,10 @@
             <el-icon><VideoCamera /></el-icon>
           </div>
         </div>
-        <h3 class="feature-title">AI动态视频生成</h3>
+        <h3 class="feature-title">图生视频</h3>
         <p class="feature-description">
-          基于文字描述生成高质量动态漫画视频，支持单镜头多镜头连续生成，
-          角色动作流畅自然，场景细节丰富
+          将每个分镜图片转换为流畅的动漫视频片段，动作自然流畅，
+          支持多种时长和画质选择，完美呈现分镜内容
         </p>
       </div>
 
@@ -46,36 +59,10 @@
             <el-icon><Microphone /></el-icon>
           </div>
         </div>
-        <h3 class="feature-title">智能音效生成</h3>
+        <h3 class="feature-title">文字转语音</h3>
         <p class="feature-description">
-          根据视频内容自动匹配背景音乐、角色语音、环境音效和动作音效，
-          音画同步，完美融合
-        </p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">
-          <div class="feature-icon">
-            <el-icon><Scissor /></el-icon>
-          </div>
-        </div>
-        <h3 class="feature-title">专业时间轴编辑</h3>
-        <p class="feature-description">
-          直观的时间轴界面，支持视频片段拖放、分割、合并，添加转场特效、文字字幕，
-          轻松完成专业剪辑
-        </p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">
-          <div class="feature-icon">
-            <el-icon><FolderOpened /></el-icon>
-          </div>
-        </div>
-        <h3 class="feature-title">云端素材管理</h3>
-        <p class="feature-description">
-          生成的素材自动保存至个人云端素材库，支持分类标签、智能搜索、
-          收藏管理，跨设备同步使用
+          为动漫视频生成自然流畅的配音，支持多种语音风格和情感表达，
+          音画同步，让角色更加生动
         </p>
       </div>
 
@@ -85,26 +72,39 @@
             <el-icon><MagicStick /></el-icon>
           </div>
         </div>
-        <h3 class="feature-title">零门槛操作</h3>
+        <h3 class="feature-title">风格多样化</h3>
         <p class="feature-description">
-          界面简洁直观，操作流程清晰，提供新手引导和一键应用功能，
-          无需专业技能，快速上手创作
+          提供丰富的风格选择，从国风古韵到二次元日漫，从3D渲染到半写实风格，
+          满足不同题材和创作需求
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">
+          <div class="feature-icon">
+            <el-icon><Odometer /></el-icon>
+          </div>
+        </div>
+        <h3 class="feature-title">完整创作流程</h3>
+        <p class="feature-description">
+          从人物创作到分镜设计，从视频生成到配音制作，一站式完成动漫视频创作，
+          简单易用，快速上手
         </p>
       </div>
     </div>
 
     <!-- 开始创作按钮 -->
     <div class="action-section">
-      <el-button 
-        type="primary" 
-        size="large" 
+      <el-button
+        type="primary"
+        size="large"
         class="start-btn"
         @click="startCreating"
       >
         <el-icon><VideoPlay /></el-icon>
         开始创作
       </el-button>
-      <p class="action-description">立即体验AI动态漫画创作的魅力</p>
+      <p class="action-description">从人物形象到完整视频，开启你的动漫创作之旅</p>
     </div>
   </div>
 </template>
@@ -116,9 +116,9 @@ import {
   EditPen,
   VideoCamera,
   Microphone,
-  Scissor,
-  FolderOpened,
+  Crop,
   MagicStick,
+  Odometer,
   VideoPlay
 } from '@element-plus/icons-vue'
 

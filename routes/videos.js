@@ -1,5 +1,6 @@
-const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -7,7 +8,7 @@ const prisma = new PrismaClient();
 router.get('/', async (req, res) => {
   try {
     const { userId } = req.query;
-    
+
     const videos = await prisma.video.findMany({
       where: { userId },
       include: {
@@ -16,8 +17,7 @@ router.get('/', async (req, res) => {
             id: true,
             username: true
           }
-        },
-        task: true
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const video = await prisma.video.findUnique({
       where: { id },
       include: {
@@ -42,8 +42,7 @@ router.get('/:id', async (req, res) => {
             id: true,
             username: true
           }
-        },
-        task: true
+        }
       }
     });
 
@@ -131,4 +130,4 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

@@ -1,222 +1,225 @@
 <template>
-  <div class="img2vid-container">
-    <el-card class="main-card" shadow="hover">
-      <div class="content-wrapper">
-        <!-- 左侧控制面板 -->
-        <div class="control-panel">
-          <div class="panel-header">
-            <h3>参数配置</h3>
-          </div>
+  <div class="pop-layout">
+    <!-- 顶部标题 -->
+    <div class="page-header">
+      <div class="title-badge yellow">
+        <el-icon><VideoCamera /></el-icon>
+        <span>动态影像</span>
+      </div>
+      <h1 class="main-title">图生视频 <span>Motion</span></h1>
+      <p class="subtitle">让静止的画面流动起来，赋予角色灵魂</p>
+    </div>
 
-          <el-form :model="form" label-position="top" class="generation-form">
-            <!-- 图片上传 -->
-            <el-form-item label="上传图片">
-              <el-upload
-                v-model:file-list="fileList"
-                :auto-upload="false"
-                :limit="1"
-                :on-change="handleFileChange"
-                :on-exceed="handleExceed"
-                :on-remove="handleRemove"
-                list-type="picture-card"
+    <div class="workspace">
+      <!-- 左侧：导演控制台 -->
+      <div class="control-panel">
+        
+        <!-- 1. 核心上传区 (场记板风格) -->
+        <div class="panel-section">
+          <div class="section-label">
+            <el-icon><Film /></el-icon> 原始素材
+          </div>
+          
+          <div 
+            class="clapperboard-upload" 
+            :class="{ 'has-image': previewUrl }"
+            @click="triggerUpload"
+          >
+            <!-- 顶部黑白条纹装饰 -->
+            <div class="clapper-top"></div>
+            
+            <div class="upload-content">
+              <input
+                type="file"
+                ref="fileInput"
+                @change="handleFileChange"
                 accept="image/*"
-                :disabled="isGenerating"
-                drag
-                :show-file-list="false"
-                class="custom-upload"
+                hidden
               >
-                <div v-if="!uploadedFile" class="upload-placeholder">
-                  <el-icon size="32"><Plus /></el-icon>
-                  <div class="upload-text">点击上传图片</div>
-                </div>
-              </el-upload>
               
-              <!-- 已上传的图片预览 -->
-              <div v-if="uploadedFile && previewUrl" class="uploaded-preview">
-                <img :src="previewUrl" class="preview-img" alt="已上传图片" />
-                <div class="preview-overlay">
-                  <el-icon class="preview-icon"><Picture /></el-icon>
-                  <div class="preview-actions">
-                    <el-button 
-                      type="danger" 
-                      size="small" 
-                      circle
-                      @click="handleRemove"
-                      :disabled="isGenerating"
-                    >
-                      <el-icon><Delete /></el-icon>
-                    </el-button>
-                  </div>
+              <div v-if="previewUrl" class="preview-wrapper">
+                <img :src="previewUrl" class="main-preview" />
+                <button class="delete-btn" @click.stop="handleRemove">
+                  <el-icon><Delete /></el-icon>
+                </button>
+                <div class="file-tag" v-if="uploadedFile">
+                  {{ (uploadedFile.size / 1024 / 1024).toFixed(2) }} MB
                 </div>
               </div>
-            </el-form-item>
+              
+              <div v-else class="placeholder">
+                <div class="icon-box">
+                  <el-icon><Plus /></el-icon>
+                </div>
+                <h3>点击上传图片</h3>
+                <p>支持 JPG / PNG，建议尺寸 1024px+</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-            <!-- 提示词 -->
-            <el-form-item label="视频描述">
-              <el-input
-                v-model="form.prompt"
-                type="textarea"
-                :rows="3"
-                placeholder="描述您想要的视频内容，例如：人物挥手微笑、樱花飘落..."
-                maxlength="500"
-                show-word-limit
-                :disabled="isGenerating"
-              />
-            </el-form-item>
+        <!-- 2. 提示词 -->
+        <div class="panel-section">
+          <div class="section-label">
+            <el-icon><Edit /></el-icon> 导演指令
+          </div>
+          <div class="input-wrapper">
+            <el-input
+              v-model="form.prompt"
+              type="textarea"
+              :rows="3"
+              placeholder="✨ 描述画面如何运动... (例如：微风吹拂头发，眨眼微笑，背景樱花飘落，运镜缓慢推进)"
+              resize="none"
+              maxlength="500"
+              show-word-limit
+            />
+          </div>
+        </div>
 
-            <!-- 画质选择 -->
-            <el-form-item label="视频画质">
-              <el-radio-group v-model="form.resolution" :disabled="isGenerating">
-                <el-radio label="576p" border>576p (1024×576)</el-radio>
-                <el-radio label="720p" border>720p (1280×720)</el-radio>
-              </el-radio-group>
-            </el-form-item>
+        <!-- 3. 参数设置 (网格布局) -->
+        <div class="settings-grid">
+          <!-- 画质 -->
+          <div class="setting-item">
+            <div class="section-label small">画质精度</div>
+            <div class="resolution-toggle">
+              <div 
+                class="res-btn" 
+                :class="{ active: form.resolution === '576p' }"
+                @click="form.resolution = '576p'"
+              >
+                <span class="res-tag">SD</span>
+                576p
+              </div>
+              <div 
+                class="res-btn" 
+                :class="{ active: form.resolution === '720p' }"
+                @click="form.resolution = '720p'"
+              >
+                <span class="res-tag hd">HD</span>
+                720p
+              </div>
+            </div>
+          </div>
 
-            <!-- 时长选择 -->
-            <el-form-item label="视频时长">
+          <!-- 时长 (滑块) -->
+          <div class="setting-item">
+            <div class="section-label small">
+              视频时长 <span class="value-badge">{{ form.duration }}s</span>
+            </div>
+            <div class="slider-wrapper">
               <el-slider
                 v-model="durationValue"
                 :min="1"
                 :max="5"
                 :step="1"
-                :marks="durationMarks"
-                show-input
-                :disabled="isGenerating"
+                :show-tooltip="false"
+                class="pop-slider"
               />
-              <div class="slider-hint">推荐：3秒（显存占用适中）</div>
-            </el-form-item>
-
-            <!-- 生成按钮 -->
-            <div class="action-buttons">
-              <el-button
-                type="primary"
-                size="large"
-                :loading="isGenerating"
-                :disabled="!uploadedFile"
-                @click="handleGenerate"
-                class="generate-btn"
-              >
-                <el-icon v-if="!isGenerating"><VideoPlay /></el-icon>
-                {{ isGenerating ? '生成中...' : '开始生成' }}
-              </el-button>
-
-              <el-button
-                size="large"
-                @click="handleReset"
-                :disabled="isGenerating"
-                class="reset-btn"
-              >
-                重置
-              </el-button>
+              <div class="slider-marks">
+                <span>1s</span>
+                <span>3s (推荐)</span>
+                <span>5s</span>
+              </div>
             </div>
-          </el-form>
+          </div>
         </div>
 
-        <!-- 右侧预览区 -->
-        <div class="preview-panel">
-          <div class="panel-header">
-            <h3>生成结果</h3>
-            <div class="header-actions">
-              <el-button
-                v-if="generatedVideo"
-                type="primary"
-                plain
-                size="small"
-                @click="downloadVideo"
-              >
-                <el-icon><Download /></el-icon>
-                下载视频
-              </el-button>
+        <!-- 生成按钮 -->
+        <button 
+          class="generate-btn" 
+          :class="{ loading: isGenerating }"
+          @click="handleGenerate"
+          :disabled="isGenerating || !uploadedFile"
+        >
+          <div class="btn-content">
+            <span v-if="!isGenerating">🎬 Action! 开始生成</span>
+            <span v-else>
+              <el-icon class="is-loading"><Loading /></el-icon> 正在渲染中...
+            </span>
+          </div>
+          <!-- 装饰性进度条底纹 -->
+          <div class="btn-progress" :style="{ width: progress + '%' }"></div>
+        </button>
+      </div>
+
+      <!-- 右侧：放映厅 -->
+      <div class="preview-panel">
+        <!-- 电视机外框 -->
+        <div class="tv-frame">
+          <!-- 天线装饰 -->
+          <div class="antenna left"></div>
+          <div class="antenna right"></div>
+          
+          <!-- 屏幕区域 -->
+          <div class="tv-screen" :class="{ 'has-video': generatedVideo }">
+            
+            <!-- 状态A: 播放视频 -->
+            <video
+              v-if="generatedVideo"
+              :src="generatedVideo"
+              controls
+              autoplay
+              loop
+              class="final-video"
+            ></video>
+
+            <!-- 状态B: 生成中 -->
+            <div v-else-if="isGenerating" class="loading-screen">
+              <div class="film-countdown">{{ Math.floor((100 - progress) / 10) }}</div>
+              <p>AI 正在逐帧绘制...</p>
+              <span class="task-id">ID: {{ taskId }}</span>
+            </div>
+
+            <!-- 状态C: 空闲 -->
+            <div v-else class="standby-screen">
+              <div class="noise-bg"></div> <!-- 噪点背景 -->
+              <div class="standby-content">
+                <el-icon size="48"><VideoPlay /></el-icon>
+                <p>READY TO PLAY</p>
+              </div>
             </div>
           </div>
 
-          <div class="preview-content">
-            <!-- 空状态 -->
-            <div v-if="!uploadedFile && !isGenerating" class="empty-state">
-              <el-icon size="64"><VideoCamera /></el-icon>
-              <p>请上传图片后点击生成按钮</p>
-            </div>
-
-            <!-- 已上传，未生成状态 -->
-            <div v-if="uploadedFile && !isGenerating && !generatedVideo" class="uploaded-state">
-              <img v-if="previewUrl" :src="previewUrl" class="preview-image" alt="预览" />
-              <p class="preview-text">✅ 图片已上传，点击"开始生成"</p>
-              <div class="file-info">
-                <p><strong>文件名:</strong> {{ uploadedFile.name }}</p>
-                <p><strong>大小:</strong> {{ (uploadedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
-              </div>
-            </div>
-
-            <!-- 生成中状态 -->
-            <div v-if="isGenerating" class="generating-state">
-              <el-progress
-                type="circle"
-                :percentage="progress"
-                :width="120"
-                :stroke-width="8"
-                :status="progressStatus"
-              >
-                <template #default="{ percentage }">
-                  <span class="progress-text">{{ percentage }}%</span>
-                </template>
-              </el-progress>
-              <p class="progress-label">{{ progressText }}</p>
-              <p v-if="taskId" class="task-id">任务ID: {{ taskId }}</p>
-            </div>
-
-            <!-- 生成结果 -->
-            <div v-if="generatedVideo" class="result-state">
-              <div class="video-container">
-                <video
-                  :src="generatedVideo"
-                  controls
-                  class="generated-video"
-                  @error="handleVideoError"
-                >
-                  您的浏览器不支持视频播放。
-                </video>
-              </div>
-
-              <!-- 视频信息 -->
-              <div class="video-info">
-                <div class="info-item">
-                  <span class="label">状态：</span>
-                  <span class="value success">✓ 生成成功</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">画质：</span>
-                  <span class="value">{{ form.resolution === '576p' ? '576p (1024×576)' : '720p (1280×720)' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">时长：</span>
-                  <span class="value">{{ form.duration }} 秒</span>
-                </div>
-              </div>
+          <!-- 电视机按钮 -->
+          <div class="tv-controls">
+            <div class="knob"></div>
+            <div class="knob"></div>
+            <div class="speaker-grill">
+              <span></span><span></span><span></span><span></span>
             </div>
           </div>
+        </div>
+
+        <!-- 操作栏 -->
+        <div v-if="generatedVideo" class="action-bar fade-in">
+          <button class="action-btn green" @click="downloadVideo">
+            <el-icon><Download /></el-icon> 保存
+          </button>
+          <button class="action-btn red" @click="handleClearAll">
+            <el-icon><Delete /></el-icon> 清除
+          </button>
         </div>
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { UploadUserFile, UploadFile } from 'element-plus'
-import request from '@/utils/request'
-import { VideoPlay, Download, Plus, VideoCamera, Picture, Delete } from '@element-plus/icons-vue'
+import type { UploadUserFile } from 'element-plus'
+import { 
+  VideoCamera, Film, Edit, Plus, Delete, Loading, VideoPlay, Download 
+} from '@element-plus/icons-vue'
 
 // 响应式数据
 const isGenerating = ref(false)
 const progress = ref(0)
-const progressText = ref('')
-const progressStatus = ref<'' | 'success' | 'exception'>('')
 const generatedVideo = ref('')
-const fileList = ref<UploadUserFile[]>([])
 const uploadedFile = ref<File | null>(null)
 const previewUrl = ref('')
 const taskId = ref<number | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 let pollingTimer: any = null
 
 // 表单数据
@@ -226,544 +229,614 @@ const form = reactive({
   duration: '3'
 })
 
-// 计算属性：duration 的滑块值（数字类型）
+// 滑块双向绑定
 const durationValue = computed({
   get: () => parseInt(form.duration),
-  set: (val: number) => {
-    form.duration = val.toString()
-  }
+  set: (val: number) => { form.duration = val.toString() }
 })
 
-// 时长刻度
-const durationMarks = {
-  1: '1s',
-  2: '2s',
-  3: '3s',
-  4: '4s',
-  5: '5s'
-}
+// --- 核心逻辑 (复用原逻辑，适配新UI) ---
 
-// 文件处理
-const handleFileChange = (file: UploadFile, newFileList: UploadUserFile[]) => {
-  console.log('📁 文件变化:', { file: file, newFileList: newFileList })
-  
-  if (newFileList.length > 0) {
-    uploadedFile.value = newFileList[0].raw as File
-    console.log('✅ 上传文件:', uploadedFile.value)
-    
-    // 生成预览URL
-    if (newFileList[0].url) {
-      previewUrl.value = newFileList[0].url
-      console.log('🔗 使用文件URL:', previewUrl.value)
-    } else if (uploadedFile.value) {
-      previewUrl.value = URL.createObjectURL(uploadedFile.value)
-      console.log('🔗 创建临时URL:', previewUrl.value)
+const loadState = () => {
+  try {
+    const saved = localStorage.getItem('img2vid_state')
+    if (saved) {
+      const state = JSON.parse(saved)
+      form.prompt = state.prompt || ''
+      form.resolution = state.resolution || '576p'
+      form.duration = state.duration || '3'
+      if (state.status === 'COMPLETED') {
+        generatedVideo.value = state.generatedVideo
+      }
+      // 恢复上传预览需重新上传，此处略过
     }
-  } else {
-    uploadedFile.value = null
-    previewUrl.value = ''
-    console.log('🗑️ 清空文件')
-  }
+  } catch (e) { console.error(e) }
 }
 
-const handleExceed = () => {
-  ElMessage.warning('只能上传一张图片')
+const saveState = () => {
+  const state = {
+    prompt: form.prompt,
+    resolution: form.resolution,
+    duration: form.duration,
+    status: isGenerating.value ? 'PROCESSING' : (generatedVideo.value ? 'COMPLETED' : ''),
+    generatedVideo: generatedVideo.value
+  }
+  localStorage.setItem('img2vid_state', JSON.stringify(state))
+}
+
+watch([form, generatedVideo, isGenerating], () => saveState(), { deep: true })
+
+onMounted(() => loadState())
+onUnmounted(() => { if (pollingTimer) clearInterval(pollingTimer) })
+
+// 上传逻辑
+const triggerUpload = () => fileInput.value?.click()
+
+const handleFileChange = (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) return ElMessage.error('请上传图片')
+  
+  uploadedFile.value = file
+  previewUrl.value = URL.createObjectURL(file)
 }
 
 const handleRemove = () => {
   uploadedFile.value = null
   previewUrl.value = ''
-  fileList.value = []
+  if (fileInput.value) fileInput.value.value = ''
 }
 
-// 提交任务
+// 生成逻辑
 const handleGenerate = async () => {
-  if (!uploadedFile.value) {
-    ElMessage.warning('请先上传图片')
-    return
-  }
-
+  if (!uploadedFile.value) return
+  
   isGenerating.value = true
-  progress.value = 10
-  progressText.value = '正在上传图片...'
-  progressStatus.value = ''
+  progress.value = 0
   generatedVideo.value = ''
-
-  const formData = new FormData()
-  formData.append('image', uploadedFile.value)
-  formData.append('prompt', form.prompt)
-  formData.append('resolution', form.resolution)
-  formData.append('duration', form.duration)
-
+  
   try {
-    // 提交任务 - 暂时使用原生axios绕过拦截器
-    const axios = (await import('axios')).default
-    const res = await axios.post('/api/generate', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    const formData = new FormData()
+    formData.append('image', uploadedFile.value)
+    formData.append('prompt', form.prompt)
+    formData.append('resolution', form.resolution)
+    formData.append('duration', form.duration)
 
-    if (res.data.success) {
-      taskId.value = res.data.taskId
-      progress.value = 20
-      progressText.value = '任务已提交，正在处理...'
-      // 开始轮询
-      startPolling(res.data.taskId)
+    const response = await fetch('http://localhost:3000/api/generate', {
+      method: 'POST',
+      body: formData
+    })
+    const data = await response.json()
+    
+    if (data.success) {
+      taskId.value = data.taskId
+      startPolling(data.taskId)
     } else {
-      throw new Error('任务提交失败')
+      throw new Error('提交失败')
     }
-  } catch (error: any) {
-    console.error('Generate error:', error)
-    console.error('Error response data:', error.response?.data)
-    
-    // 更详细的错误处理
-    let errorMessage = '任务提交失败'
-    if (error.response?.status === 500) {
-      errorMessage = '服务器内部错误，请检查后端服务是否正常启动'
-    } else if (error.response?.status === 400) {
-      console.error('400错误详情:', error.response?.data)
-      errorMessage = error.response?.data?.error || '请求参数错误'
-    } else if (error.code === 'ERR_NETWORK') {
-      errorMessage = '网络连接失败，请检查后端服务是否运行在3000端口'
-    } else if (error.response?.data?.error) {
-      errorMessage = error.response.data.error
-    }
-    
-    ElMessage.error(errorMessage)
+  } catch (e: any) {
+    ElMessage.error(e.message || '网络错误')
     isGenerating.value = false
-    progress.value = 0
   }
 }
 
-// 轮询状态
 const startPolling = (id: number) => {
+  if (pollingTimer) clearInterval(pollingTimer)
+  
   pollingTimer = setInterval(async () => {
     try {
-      const axios = (await import('axios')).default
-      const res = await axios.get(`/api/status/${id}`)
-      const { status, videoUrl } = res.data
-
-      if (status === 'PENDING') {
-        progress.value = 30
-        progressText.value = '等待处理...'
-      } else if (status === 'PROCESSING') {
-        progress.value = Math.min(80, progress.value + 5)
-        progressText.value = '正在生成视频，请稍候...'
-      } else if (status === 'COMPLETED') {
+      // 模拟进度条增长 (为了视觉效果)
+      if (progress.value < 90) progress.value += Math.random() * 5
+      
+      const response = await fetch(`http://localhost:3000/api/status/${id}`)
+      const data = await response.json()
+      
+      if (data.status === 'COMPLETED') {
         clearInterval(pollingTimer)
         progress.value = 100
-        progressText.value = '生成完成！'
-        progressStatus.value = 'success'
-        generatedVideo.value = videoUrl
-        ElMessage.success('视频生成成功！')
-
-        setTimeout(() => {
-          isGenerating.value = false
-        }, 1000)
-      } else if (status === 'FAILED') {
-        clearInterval(pollingTimer)
-        progress.value = 0
-        progressStatus.value = 'exception'
-        progressText.value = '生成失败'
-        ElMessage.error('生成失败，请重试')
+        generatedVideo.value = data.videoUrl
         isGenerating.value = false
+        ElMessage.success('视频生成成功！')
+      } else if (data.status === 'FAILED') {
+        clearInterval(pollingTimer)
+        isGenerating.value = false
+        ElMessage.error('生成失败')
       }
-    } catch (e: any) {
-      console.error('Polling error:', e)
-      clearInterval(pollingTimer)
-      isGenerating.value = false
-      ElMessage.error('查询状态失败')
-    }
+    } catch (e) { console.error(e) }
   }, 2000)
 }
 
-// 重置表单
-const handleReset = () => {
-  console.log('🔄 重置表单')
-  if (isGenerating.value && pollingTimer) {
-    clearInterval(pollingTimer)
-  }
-
+const handleClearAll = () => {
   form.prompt = ''
-  form.resolution = '576p'
-  form.duration = '3'
-  uploadedFile.value = null
-  fileList.value = []
+  handleRemove()
   generatedVideo.value = ''
-  previewUrl.value = ''
-  taskId.value = null
-  progress.value = 0
-  progressText.value = ''
-  progressStatus.value = ''
+  localStorage.removeItem('img2vid_state')
 }
 
-// 下载视频
 const downloadVideo = () => {
   if (!generatedVideo.value) return
-
   const link = document.createElement('a')
   link.href = generatedVideo.value
-  link.download = `video-${Date.now()}.mp4`
+  link.download = `motion-${Date.now()}.mp4`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-
-  ElMessage.success('下载已开始')
 }
-
-// 视频错误处理
-const handleVideoError = () => {
-  ElMessage.error('视频加载失败，请检查视频链接')
-}
-
-// 组件卸载时清理轮询
-import { onUnmounted } from 'vue'
-onUnmounted(() => {
-  if (pollingTimer) {
-    clearInterval(pollingTimer)
-  }
-})
 </script>
 
 <style lang="scss" scoped>
-.img2vid-container {
-  height: 100%;
+/* Pop-Energy 色板 (强调黄/紫) */
+$bg-color: #FBF8F3;
+$dark: #1A1A1A;
+$yellow: #FFD93D;
+$purple: #764BA2;
+$blue: #4D96FF;
+$green: #6BCB77;
+$red: #FF6B6B;
 
-  .main-card {
-    height: calc(100vh - 140px);
-    border: none;
-    border-radius: 16px;
-    overflow: hidden;
-
-    .content-wrapper {
-      display: flex;
-      height: 100%;
-      gap: 24px;
-    }
-  }
+.pop-layout {
+  min-height: 100vh;
+  background-color: $bg-color;
+  /* 动态条纹背景 */
+  background-image: repeating-linear-gradient(
+    45deg,
+    #f0f0f0 25%,
+    transparent 25%,
+    transparent 75%,
+    #f0f0f0 75%,
+    #f0f0f0
+  );
+  background-size: 20px 20px;
+  padding: 20px;
+  color: $dark;
 }
 
-.control-panel {
-  flex: 1;
-  max-width: 450px;
-  border-right: 1px solid var(--el-border-color-light);
-  padding-right: 24px;
-  overflow-y: auto;
-  height: 100%;
-  padding-bottom: 20px;
-  box-sizing: border-box;
-
-  .panel-header {
-    margin-bottom: 24px;
-
-    h3 {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-      margin: 0;
-    }
-  }
-
-  .generation-form {
-    min-height: 100%;
-    padding-bottom: 20px;
-    
-    .el-form-item {
-      margin-bottom: 24px;
-
-      :deep(.el-form-item__label) {
-        font-weight: 600;
-        color: var(--el-text-color-primary);
-      }
-    }
-
-    .slider-hint {
-      text-align: center;
-      margin-top: 8px;
-      color: var(--el-color-info);
-      font-size: 12px;
-    }
-  }
-
-  .action-buttons {
-    display: flex;
-    gap: 12px;
-    margin-top: 24px;
-
-    .generate-btn {
-      flex: 1;
-      height: 44px;
-      font-size: 16px;
-      font-weight: 600;
-      border-radius: 8px;
-    }
-
-    .reset-btn {
-      height: 44px;
-      border-radius: 8px;
-    }
-  }
-}
-
-.preview-panel {
-  flex: 1;
-  padding-left: 24px;
-
-  .panel-header {
-    display: flex;
-    justify-content: space-between;
+.page-header {
+  text-align: center;
+  margin-bottom: 30px;
+  
+  .title-badge {
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 24px;
-
-    h3 {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-      margin: 0;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 8px;
-    }
-  }
-
-  .preview-content {
-    height: calc(100% - 60px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .empty-state,
-    .uploaded-state {
-      text-align: center;
-      color: var(--el-text-color-secondary);
-
-      .el-icon {
-        margin-bottom: 16px;
-        opacity: 0.5;
-      }
-
-      .preview-image {
-        max-width: 300px;
-        max-height: 300px;
-        border-radius: 12px;
-        box-shadow: var(--el-box-shadow-light);
-        margin-bottom: 16px;
-      }
-
-      .preview-text {
-        font-size: 16px;
-        color: var(--el-color-primary);
-        font-weight: 500;
-        margin-top: 12px;
-      }
-      
-      .file-info {
-        margin-top: 16px;
-        padding: 12px;
-        background: var(--el-bg-color-page);
-        border-radius: 8px;
-        font-size: 14px;
-        
-        p {
-          margin: 4px 0;
-          color: var(--el-text-color-regular);
-          
-          strong {
-            color: var(--el-text-color-primary);
-            margin-right: 8px;
-          }
-        }
-      }
-    }
-
-    .generating-state {
-      text-align: center;
-
-      .progress-text {
-        font-size: 18px;
-        font-weight: 600;
-        color: var(--el-color-primary);
-      }
-
-      .progress-label {
-        margin-top: 16px;
-        color: var(--el-text-color-secondary);
-        font-size: 14px;
-      }
-
-      .task-id {
-        margin-top: 8px;
-        color: var(--el-text-color-placeholder);
-        font-size: 12px;
-      }
-    }
-
-    .result-state {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .video-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--el-fill-color-light);
-      border-radius: 12px;
-      padding: 20px;
-
-      .generated-video {
-        max-width: 100%;
-        max-height: 100%;
-        border-radius: 8px;
-        box-shadow: var(--el-box-shadow);
-      }
-    }
-
-    .video-info {
-      background: var(--el-bg-color);
-      border-radius: 12px;
-      padding: 16px;
-
-      .info-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid var(--el-border-color-lighter);
-
-        &:last-child {
-          border-bottom: none;
-        }
-
-        .label {
-          font-weight: 600;
-          color: var(--el-text-color-secondary);
-        }
-
-        .value {
-          color: var(--el-text-color-primary);
-
-          &.success {
-            color: var(--el-color-success);
-          }
-        }
-      }
-    }
-  }
-}
-
-// 自定义上传组件样式
-.custom-upload {
-  :deep(.el-upload) {
-    border: 2px dashed var(--el-border-color);
-    border-radius: 12px;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    transition: var(--el-transition-duration-fast);
+    gap: 8px;
+    background: $dark;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 10px;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
     
-    &:hover {
-      border-color: var(--el-color-primary);
-    }
-    
-    .upload-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      height: 100%;
-      color: var(--el-text-color-secondary);
-      gap: 8px;
-      padding: 20px;
-      padding-top: 4px;
-      
-      .upload-text {
-        font-size: 14px;
-        line-height: 1;
-      }
-    }
+    &.yellow { background: $yellow; color: $dark; }
   }
   
-  // 当有图片时隐藏上传区域
-  &:has(+ .uploaded-preview) {
-    :deep(.el-upload) {
-      display: none;
+  .main-title {
+    font-size: 36px;
+    font-weight: 900;
+    margin: 0;
+    
+    span {
+      color: $purple;
+      font-style: italic;
+      font-family: 'Courier New', Courier, monospace;
     }
   }
+  .subtitle { margin-top: 8px; color: #666; }
 }
 
-// 上传图片预览样式
-.uploaded-preview {
-  position: relative;
-  width: 100%;
-  max-width: 200px;
+.workspace {
+  display: grid;
+  grid-template-columns: 450px 1fr;
+  gap: 30px;
+  max-width: 1400px;
   margin: 0 auto;
+  align-items: start;
+}
+
+/* --- 左侧控制台 --- */
+.control-panel {
+  background: white;
+  border: 3px solid $dark;
+  border-radius: 24px;
+  box-shadow: 8px 8px 0 $dark;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.panel-section .section-label {
+  font-weight: 800;
+  font-size: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 场记板上传区 */
+.clapperboard-upload {
+  border: 3px solid $dark;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #FAFAFA;
   
-  .preview-img {
-    width: 100%;
-    height: auto;
-    border-radius: 12px;
-    box-shadow: var(--el-box-shadow-light);
-    display: block;
+  &:hover { transform: translateY(-2px); box-shadow: 4px 4px 0 rgba(0,0,0,0.1); }
+  &.has-image { background: $dark; }
+  
+  .clapper-top {
+    height: 24px;
+    background: repeating-linear-gradient(
+      135deg,
+      $dark,
+      $dark 20px,
+      white 20px,
+      white 40px
+    );
+    border-bottom: 3px solid $dark;
   }
   
-  .preview-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 12px;
+  .upload-content {
+    height: 220px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    position: relative;
     
-    .preview-icon {
-      color: white;
-      font-size: 32px;
-      margin-bottom: 16px;
+    .placeholder {
+      text-align: center;
+      .icon-box {
+        width: 50px;
+        height: 50px;
+        background: $yellow;
+        border: 2px solid $dark;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin: 0 auto 10px;
+      }
+      h3 { margin: 0; font-size: 16px; }
+      p { font-size: 12px; color: #999; margin-top: 4px; }
     }
     
-    .preview-actions {
-      .el-button {
-        transform: scale(0.8);
+    .preview-wrapper {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      
+      .main-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+      
+      .delete-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: $red;
+        color: white;
+        border: 2px solid white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        &:hover { transform: scale(1.1); }
+      }
+      
+      .file-tag {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
       }
     }
   }
+}
+
+/* 输入框 */
+.input-wrapper :deep(.el-textarea__inner) {
+  border: 2px solid $dark;
+  border-radius: 12px;
+  background: #F5F5F5;
+  box-shadow: none;
+  &:focus { background: white; box-shadow: 4px 4px 0 $yellow; }
+}
+
+/* 参数网格 */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   
-  &:hover .preview-overlay {
-    opacity: 1;
+  .setting-item {
+    background: #F9F9F9;
+    border: 2px solid #E0E0E0;
+    border-radius: 12px;
+    padding: 12px;
+    
+    .section-label.small {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      
+      .value-badge {
+        background: $purple;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    }
   }
 }
 
-// 响应式设计
+/* 画质切换按钮 */
+.resolution-toggle {
+  display: flex;
+  gap: 8px;
+  
+  .res-btn {
+    flex: 1;
+    border: 2px solid #DDD;
+    border-radius: 8px;
+    padding: 8px 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    position: relative;
+    background: white;
+    
+    .res-tag {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      font-size: 8px;
+      background: #999;
+      color: white;
+      padding: 1px 4px;
+      border-radius: 4px;
+      &.hd { background: $blue; }
+    }
+    
+    &.active {
+      border-color: $dark;
+      background: $yellow;
+      box-shadow: 2px 2px 0 $dark;
+    }
+  }
+}
+
+/* 滑块样式重置 */
+.pop-slider {
+  :deep(.el-slider__bar) { background-color: $purple; height: 8px; border-radius: 4px; }
+  :deep(.el-slider__runway) { height: 8px; background-color: #DDD; border: 1px solid #CCC; }
+  :deep(.el-slider__button) { 
+    width: 16px; height: 16px; border: 3px solid $dark; background: $yellow; 
+  }
+}
+.slider-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* 生成按钮 */
+.generate-btn {
+  width: 100%;
+  height: 60px;
+  background: $dark;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 6px 6px 0 $purple;
+  transition: all 0.1s;
+  
+  &:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 $purple; }
+  &:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 $purple; }
+  &:disabled { background: #999; box-shadow: none; cursor: not-allowed; }
+  
+  .btn-content {
+    position: relative;
+    z-index: 2;
+    font-size: 18px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+  }
+  
+  .btn-progress {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: repeating-linear-gradient(45deg, $purple, $purple 10px, lighten($purple, 10%) 10px, lighten($purple, 10%) 20px);
+    z-index: 1;
+    opacity: 0.5;
+    transition: width 0.3s;
+  }
+}
+
+/* --- 右侧放映厅 --- */
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 电视机外框 */
+.tv-frame {
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 16/9;
+  background: $dark;
+  border-radius: 30px;
+  padding: 20px;
+  position: relative;
+  box-shadow: 12px 12px 0 rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  
+  /* 天线 */
+  .antenna {
+    position: absolute;
+    width: 4px;
+    height: 60px;
+    background: $dark;
+    top: -50px;
+    z-index: -1;
+    &.left { left: 40px; transform: rotate(-20deg); }
+    &.right { left: 80px; transform: rotate(20deg); }
+    &::after {
+      content: '';
+      position: absolute;
+      top: -10px;
+      left: -6px;
+      width: 16px;
+      height: 16px;
+      background: $red;
+      border-radius: 50%;
+      border: 3px solid $dark;
+    }
+  }
+  
+  .tv-screen {
+    flex: 1;
+    background: #111;
+    border-radius: 16px; /* 屏幕圆角 */
+    border: 4px solid #333;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    
+    &.has-video { border-color: #000; }
+    
+    .final-video { width: 100%; height: 100%; object-fit: contain; }
+    
+    .standby-screen {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      
+      .noise-bg {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url('data:image/svg+xml;base64,...'); /* 可选：噪点图 */
+        opacity: 0.1;
+      }
+      .standby-content {
+        text-align: center;
+        z-index: 1;
+        p { font-family: 'Courier New', monospace; font-weight: bold; margin-top: 10px; }
+      }
+    }
+    
+    .loading-screen {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      
+      .film-countdown {
+        font-size: 80px;
+        font-weight: bold;
+        border: 4px solid white;
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        background: rgba(255,255,255,0.1);
+      }
+      .task-id { margin-top: 10px; font-size: 12px; opacity: 0.5; font-family: monospace; }
+    }
+  }
+  
+  .tv-controls {
+    height: 40px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding-left: 10px;
+    
+    .knob {
+      width: 24px;
+      height: 24px;
+      background: #333;
+      border-radius: 50%;
+      border: 2px solid #555;
+      box-shadow: 2px 2px 0 black;
+    }
+    .speaker-grill {
+      margin-left: auto;
+      display: flex;
+      gap: 4px;
+      span { width: 4px; height: 16px; background: #222; border-radius: 2px; }
+    }
+  }
+}
+
+.action-bar {
+  margin-top: 20px;
+  display: flex;
+  gap: 16px;
+  
+  .action-btn {
+    padding: 10px 24px;
+    border: 3px solid $dark;
+    border-radius: 50px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    background: white;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+    
+    &:hover { transform: translateY(-2px); }
+    &:active { transform: translateY(1px); box-shadow: none; }
+    
+    &.green { color: $dark; background: $green; }
+    &.red { color: $dark; background: $red; }
+  }
+}
+
+/* 响应式 */
 @media (max-width: 1024px) {
-  .content-wrapper {
-    flex-direction: column !important;
-  }
-
-  .control-panel {
-    max-width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--el-border-color-light);
-    padding-right: 0;
-    padding-bottom: 24px;
-  }
-
-  .preview-panel {
-    padding-left: 0;
-    padding-top: 24px;
-  }
+  .workspace { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
 }
 </style>

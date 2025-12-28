@@ -52,19 +52,34 @@ export const useUserStore = defineStore('user', () => {
       if (response.token && response.user) {
         token.value = response.token
         userInfo.value = response.user
-        
+
         localStorage.setItem('token', response.token)
         localStorage.setItem('userInfo', JSON.stringify(response.user))
-        
+
         ElMessage.success('登录成功')
         return { success: true, data: response.user }
       }
-      
+
+      // 后端返回的错误消息
+      if (response.message) {
+        throw new Error(response.message)
+      }
+
       throw new Error('登录失败')
     } catch (error: any) {
       console.error('Login error:', error)
-      ElMessage.error(error.message || '登录失败')
-      return { success: false, error: error.message }
+
+      // 提取错误消息
+      let errorMessage = '登录失败'
+
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+
+      ElMessage.error(errorMessage)
+      return { success: false, error: errorMessage }
     }
   }
 

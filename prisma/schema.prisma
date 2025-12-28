@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -46,28 +46,36 @@ model Video {
 
 model VideoTask {
   id               Int      @id @default(autoincrement())
-  
-  // 提示词相关
-  userPrompt       String   @db.Text
-  style            String
-  translatedPrompt String?  @db.Text
-  
+
+  // 新增: 任务类型: "TXT2IMG", "IMG2IMG", "IMG2VID"
+  type             String   @default("IMG2VID")
+
   // 任务状态
   status           String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
-  
+
+  // 提示词相关 (向后兼容)
+  userPrompt       String?  @db.Text
+  style            String?
+  translatedPrompt String?  @db.Text
+
   // 关联 ComfyUI 的 ID
-  promptId         String?  @unique // 任务ID必须唯一
-  
+  promptId         String?  @unique
+
   // 结果
-  videoUrl         String?  @db.VarChar(512)
-  
-  // 关联用户 (可选，如果暂不做登录，这两行可以删掉)
+  resultUrl        String?  @db.VarChar(512)
+  videoUrl         String?  @db.VarChar(512) // 向后兼容旧字段
+
+  // 新增: 存储参考图路径 (图生图专用)
+  refImageBody     String?
+  refImageFace     String?
+
+  // 关联用户
   userId           String?
   user             User?    @relation(fields: [userId], references: [id])
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  
+
   @@map("video_tasks")
 }
 

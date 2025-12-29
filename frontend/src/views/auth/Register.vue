@@ -238,6 +238,8 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+@use "sass:color" as *;
+
 /* 同样使用波普风色板，但调整主次 */
 $pop-bg: #FBF8F3;
 $pop-dark: #1A1A1A;
@@ -448,9 +450,9 @@ $pop-green: #6BCB77;
         background: $pop-green;
         color: white;
         box-shadow: 4px 4px 0px $pop-dark;
-        
+
         &:hover {
-          background: lighten($pop-green, 5%);
+          background: color.lighten($pop-green, 5%);
           transform: translate(-1px, -1px);
           box-shadow: 6px 6px 0px $pop-dark;
         }

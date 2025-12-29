@@ -365,6 +365,8 @@ const downloadVideo = () => {
 </script>
 
 <style lang="scss" scoped>
+@use "sass:color" as *;
+
 /* Pop-Energy 色板 (强调黄/紫) */
 $bg-color: #FBF8F3;
 $dark: #1A1A1A;
@@ -674,7 +676,7 @@ $red: #FF6B6B;
     left: 0;
     top: 0;
     height: 100%;
-    background: repeating-linear-gradient(45deg, $purple, $purple 10px, lighten($purple, 10%) 10px, lighten($purple, 10%) 20px);
+    background: repeating-linear-gradient(45deg, $purple, $purple 10px, color.lighten($purple, 10%) 10px, color.lighten($purple, 10%) 20px);
     z-index: 1;
     opacity: 0.5;
     transition: width 0.3s;

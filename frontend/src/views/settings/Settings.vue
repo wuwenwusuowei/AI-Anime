@@ -1,167 +1,195 @@
 <template>
-  <div class="settings-container">
-    <el-card class="settings-card">
-      <div class="settings-content">
-        <!-- 基础设置 -->
-        <div class="settings-section">
-          <el-form :model="basicSettings" label-position="top">
-            <el-form-item>
-              <div class="user-profile">
-                <el-avatar :size="80" class="user-avatar">
-                  {{ basicSettings.username ? basicSettings.username.charAt(0).toUpperCase() : 'U' }}
-                </el-avatar>
-                <div class="user-info">
-                  <div class="info-item">
-                    <div class="username">{{ basicSettings.username || '未设置用户名' }}</div>
-                    <el-button 
-                      :icon="Edit" 
-                      text 
-                      @click="showEditUsernameDialog"
-                      class="inline-edit-btn"
-                    />
-                  </div>
-                  <div class="info-item">
-                    <div class="signature">{{ basicSettings.signature || '这个人很懒，什么都没留下' }}</div>
-                    <el-button 
-                      :icon="Edit" 
-                      text 
-                      @click="showEditSignatureDialog"
-                      class="inline-edit-btn"
-                    />
-                  </div>
-                </div>
-              </div>
-            </el-form-item>
-            
-            <el-form-item label="邮箱">
-              <el-input :model-value="basicSettings.email" placeholder="请输入邮箱" disabled />
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <div class="settings-section">
-          <div class="section-title">
-            <el-icon><Lock /></el-icon>
-            <span>账户安全</span>
-          </div>
-          
-          <el-form :model="passwordForm" label-position="top" :rules="passwordRules" ref="passwordFormRef">
-            <el-form-item label="当前密码" prop="currentPassword">
-              <el-input 
-                v-model="passwordForm.currentPassword" 
-                type="password"
-                placeholder="请输入当前密码"
-                show-password
-              />
-            </el-form-item>
-            
-            <el-form-item label="新密码" prop="newPassword">
-              <el-input 
-                v-model="passwordForm.newPassword" 
-                type="password"
-                placeholder="请输入新密码"
-                show-password
-              />
-            </el-form-item>
-            
-            <el-form-item label="确认新密码" prop="confirmPassword">
-              <el-input 
-                v-model="passwordForm.confirmPassword" 
-                type="password"
-                placeholder="请再次输入新密码"
-                show-password
-              />
-            </el-form-item>
-            
-            <el-form-item>
-              <el-button 
-                type="primary" 
-                @click="handleChangePassword"
-                :loading="passwordLoading"
-              >
-                修改密码
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </div>
-
-
-
-
-
-
+  <div class="pop-layout">
+    <!-- 顶部标题 -->
+    <div class="page-header">
+      <div class="title-badge pink">
+        <el-icon><Tools /></el-icon>
+        <span>控制中心</span>
       </div>
-    </el-card>
+      <h1 class="main-title">账号 <span>Settings</span></h1>
+    </div>
 
-    <!-- 编辑用户名弹窗 -->
+    <div class="bento-grid">
+      <!-- 左侧：身份卡片 (ID Card) -->
+      <div class="pop-card profile-card">
+        <div class="card-deco-stripes"></div>
+        <div class="card-label yellow">ID CARD</div>
+        
+        <div class="avatar-section">
+          <div class="avatar-frame">
+            <el-avatar :size="100" :src="basicSettings.avatar" class="pop-avatar">
+              {{ basicSettings.username ? basicSettings.username.charAt(0).toUpperCase() : 'U' }}
+            </el-avatar>
+            <div class="edit-avatar-btn">
+              <el-icon><Camera /></el-icon>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <div class="info-group">
+            <label>NICKNAME</label>
+            <div class="display-box">
+              <span class="text">{{ basicSettings.username || '未设置用户名' }}</span>
+              <button class="icon-btn" @click="showEditUsernameDialog">
+                <el-icon><Edit /></el-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="info-group">
+            <label>BIO / SIGNATURE</label>
+            <div class="display-box signature-box">
+              <span class="text">{{ basicSettings.signature || '这个人很懒，什么都没留下...' }}</span>
+              <button class="icon-btn" @click="showEditSignatureDialog">
+                <el-icon><Edit /></el-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="info-group">
+            <label>EMAIL</label>
+            <div class="display-box locked">
+              <el-icon><Message /></el-icon>
+              <span class="text">{{ basicSettings.email || 'user@example.com' }}</span>
+              <el-icon class="lock-icon"><Lock /></el-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：安全保险箱 (Security Vault) -->
+      <div class="pop-card security-card">
+        <div class="card-label blue">VAULT</div>
+        <div class="vault-header">
+          <div class="vault-icon"><el-icon><Key /></el-icon></div>
+          <h3>密码修改</h3>
+          <p>保护好你的密钥，不要告诉陌生人哦</p>
+        </div>
+
+        <el-form 
+          :model="passwordForm" 
+          :rules="passwordRules" 
+          ref="passwordFormRef"
+          class="pop-form"
+          label-position="top"
+        >
+          <el-form-item label="当前密码" prop="currentPassword">
+            <el-input 
+              v-model="passwordForm.currentPassword" 
+              type="password"
+              placeholder="请输入旧密码..."
+              show-password
+              class="pop-input"
+            />
+          </el-form-item>
+          
+          <el-form-item label="新密码" prop="newPassword">
+            <el-input 
+              v-model="passwordForm.newPassword" 
+              type="password"
+              placeholder="设置一个强密码..."
+              show-password
+              class="pop-input"
+            />
+          </el-form-item>
+          
+          <el-form-item label="确认新密码" prop="confirmPassword">
+            <el-input 
+              v-model="passwordForm.confirmPassword" 
+              type="password"
+              placeholder="再输入一次..."
+              show-password
+              class="pop-input"
+            />
+          </el-form-item>
+          
+          <div class="form-actions">
+            <button 
+              class="pop-btn save-btn" 
+              @click.prevent="handleChangePassword"
+              :disabled="passwordLoading"
+            >
+              <span v-if="!passwordLoading">更新密码 🔐</span>
+              <span v-else>加密中...</span>
+            </button>
+          </div>
+        </el-form>
+      </div>
+    </div>
+
+    <!-- 弹窗：编辑用户名 -->
     <el-dialog 
       v-model="editUsernameDialogVisible" 
-      title="编辑用户名" 
+      :title="null"
       width="400px"
-      :before-close="handleUsernameClose"
+      :show-close="false"
+      class="pop-dialog"
     >
-      <el-form :model="usernameForm" label-position="top" :rules="usernameRules" ref="usernameFormRef">
-        <el-form-item label="用户名" prop="username">
-          <el-input 
-            v-model="usernameForm.username" 
-            placeholder="请输入用户名"
-            maxlength="20"
-            show-word-limit
-          />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
+      <div class="pop-dialog-header">
+        <span class="title">✏️ 修改昵称</span>
+        <button class="close-btn" @click="handleUsernameClose">×</button>
+      </div>
+      <div class="pop-dialog-body">
+        <el-form :model="usernameForm" :rules="usernameRules" ref="usernameFormRef">
+          <el-form-item prop="username">
+            <el-input 
+              v-model="usernameForm.username" 
+              placeholder="请输入新昵称"
+              maxlength="20"
+              show-word-limit
+              class="pop-input large"
+            />
+          </el-form-item>
+        </el-form>
         <div class="dialog-footer">
-          <el-button @click="handleUsernameClose">取消</el-button>
-          <el-button type="primary" @click="handleUsernameConfirm" :loading="usernameLoading">
-            确定
-          </el-button>
+          <button class="pop-btn cancel" @click="handleUsernameClose">取消</button>
+          <button class="pop-btn confirm" @click="handleUsernameConfirm">保存</button>
         </div>
-      </template>
+      </div>
     </el-dialog>
 
-    <!-- 编辑个性签名弹窗 -->
+    <!-- 弹窗：编辑签名 -->
     <el-dialog 
       v-model="editSignatureDialogVisible" 
-      title="编辑个性签名" 
+      :title="null" 
       width="400px"
-      :before-close="handleSignatureClose"
+      :show-close="false"
+      class="pop-dialog"
     >
-      <el-form :model="signatureForm" label-position="top" :rules="signatureRules" ref="signatureFormRef">
-        <el-form-item label="个性签名" prop="signature">
-          <el-input 
-            v-model="signatureForm.signature" 
-            type="textarea"
-            :rows="3"
-            placeholder="写点什么介绍一下自己吧..."
-            maxlength="50"
-            show-word-limit
-          />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
+      <div class="pop-dialog-header">
+        <span class="title">📝 个性签名</span>
+        <button class="close-btn" @click="handleSignatureClose">×</button>
+      </div>
+      <div class="pop-dialog-body">
+        <el-form :model="signatureForm" :rules="signatureRules" ref="signatureFormRef">
+          <el-form-item prop="signature">
+            <el-input 
+              v-model="signatureForm.signature" 
+              type="textarea"
+              :rows="4"
+              placeholder="写点什么有趣的..."
+              maxlength="50"
+              show-word-limit
+              class="pop-textarea"
+              resize="none"
+            />
+          </el-form-item>
+        </el-form>
         <div class="dialog-footer">
-          <el-button @click="handleSignatureClose">取消</el-button>
-          <el-button type="primary" @click="handleSignatureConfirm" :loading="signatureLoading">
-            确定
-          </el-button>
+          <button class="pop-btn cancel" @click="handleSignatureClose">取消</button>
+          <button class="pop-btn confirm" @click="handleSignatureConfirm">保存</button>
         </div>
-      </template>
+      </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
-  User,
-  Bell,
-  UserFilled,
-  Edit,
-  Lock
+  Tools, Edit, Lock, Key, Camera, Message
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
@@ -169,40 +197,42 @@ import request from '@/utils/request'
 // 用户存储
 const userStore = useUserStore()
 
-const saving = ref(false)
-
-// 编辑用户名相关
+// --- 状态逻辑保持不变 ---
 const editUsernameDialogVisible = ref(false)
 const usernameLoading = ref(false)
 const usernameFormRef = ref()
+const usernameForm = reactive({ username: '' })
 
-const usernameForm = reactive({
-  username: ''
-})
-
-const usernameRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 2, max: 20, message: '用户名长度在 2 到 20 个字符', trigger: 'blur' }
-  ]
-}
-
-// 编辑个性签名相关
 const editSignatureDialogVisible = ref(false)
 const signatureLoading = ref(false)
 const signatureFormRef = ref()
+const signatureForm = reactive({ signature: '' })
 
-const signatureForm = reactive({
-  signature: ''
+const passwordLoading = ref(false)
+const passwordFormRef = ref()
+const passwordForm = reactive({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
 })
 
+// 校验规则
+const usernameRules = {
+  username: [{ required: true, message: '昵称不能为空', trigger: 'blur' }, { min: 2, max: 20, message: '长度在 2-20 个字符', trigger: 'blur' }]
+}
 const signatureRules = {
-  signature: [
-    { max: 50, message: '个性签名不能超过 50 个字符', trigger: 'blur' }
+  signature: [{ max: 50, message: '签名太长啦 (max 50)', trigger: 'blur' }]
+}
+const passwordRules = {
+  currentPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
+  newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }, { min: 6, max: 20, message: '长度 6-20 位', trigger: 'blur' }],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: (r:any, v:string, cb:Function) => v !== passwordForm.newPassword ? cb(new Error('密码不一致')) : cb(), trigger: 'blur' }
   ]
 }
 
-// 基础设置 - 从用户存储获取数据
+// 基础数据
 const basicSettings = reactive({
   username: computed(() => userStore.userInfo?.username || ''),
   email: computed(() => userStore.userInfo?.email || ''),
@@ -210,384 +240,427 @@ const basicSettings = reactive({
   signature: computed(() => userStore.userInfo?.signature || '')
 })
 
-// 密码修改相关
-const passwordLoading = ref(false)
-const passwordFormRef = ref()
-
-const passwordForm = reactive({
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: ''
-})
-
-const passwordRules = {
-  currentPassword: [
-    { required: true, message: '请输入当前密码', trigger: 'blur' }
-  ],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    {
-      validator: (rule: any, value: string, callback: Function) => {
-        if (value !== passwordForm.newPassword) {
-          callback(new Error('两次输入的密码不一致'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
-}
-
-// 生成设置
-const generationSettings = reactive({
-  image: {
-    quality: 'high',
-    style: 'anime',
-    size: '768x768'
-  },
-  video: {
-    resolution: '720p',
-    duration: 3,
-    fps: '30'
-  },
-  tts: {
-    voice: 'female_gentle',
-    speed: 1.0,
-    autoGenerate: false
-  }
-})
-
-const durationMarks = {
-  1: '1s',
-  2: '2s',
-  3: '3s',
-  4: '4s',
-  5: '5s'
-}
-
-// 事件处理
-const saveSettings = async () => {
-  saving.value = true
-  try {
-    // 保存生成设置到localStorage
-    localStorage.setItem('settings', JSON.stringify({
-      generation: generationSettings
-    }))
-    
-    ElMessage.success('设置保存成功')
-  } catch (error) {
-    ElMessage.error('设置保存失败')
-  } finally {
-    saving.value = false
-  }
-}
-
-const resetSettings = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '确定要重置所有设置为默认值吗？此操作不可撤销。',
-      '确认重置',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    // 重置为默认值
-    Object.assign(generationSettings, {
-      image: {
-        quality: 'high',
-        style: 'anime',
-        size: '768x768'
-      },
-      video: {
-        resolution: '720p',
-        duration: 3,
-        fps: '30'
-      },
-      tts: {
-        voice: 'female_gentle',
-        speed: 1.0,
-        autoGenerate: false
-      }
-    })
-    
-    ElMessage.success('设置已重置为默认值')
-  } catch {
-    // 用户取消
-  }
-}
-
-const loadSettings = () => {
-  try {
-    const saved = localStorage.getItem('settings')
-    if (saved) {
-      const settings = JSON.parse(saved)
-      Object.assign(generationSettings, settings.generation || {})
-    }
-  } catch (error) {
-    console.error('加载设置失败:', error)
-  }
-}
-
-// 编辑用户名相关函数
+// 方法
 const showEditUsernameDialog = () => {
-  usernameForm.username = basicSettings.username || ''
+  usernameForm.username = basicSettings.username
   editUsernameDialogVisible.value = true
 }
-
 const handleUsernameClose = () => {
   editUsernameDialogVisible.value = false
   usernameFormRef.value?.resetFields()
 }
-
 const handleUsernameConfirm = async () => {
   if (!usernameFormRef.value) return
-  
+  await usernameFormRef.value.validate()
+  usernameLoading.value = true
   try {
-    await usernameFormRef.value.validate()
-    usernameLoading.value = true
-    
-    // 更新用户名到用户存储
-    userStore.updateUserInfo({
-      username: usernameForm.username
-    })
-    
-    ElMessage.success('用户名更新成功')
-    editUsernameDialogVisible.value = false
-    usernameFormRef.value?.resetFields()
-  } catch (error) {
-    console.error('更新用户名失败:', error)
-  } finally {
-    usernameLoading.value = false
-  }
+    userStore.updateUserInfo({ username: usernameForm.username })
+    ElMessage.success('昵称更新成功！')
+    handleUsernameClose()
+  } catch(e) { console.error(e) } finally { usernameLoading.value = false }
 }
 
-// 编辑个性签名相关函数
 const showEditSignatureDialog = () => {
-  signatureForm.signature = basicSettings.signature || ''
+  signatureForm.signature = basicSettings.signature
   editSignatureDialogVisible.value = true
 }
-
 const handleSignatureClose = () => {
   editSignatureDialogVisible.value = false
   signatureFormRef.value?.resetFields()
 }
-
 const handleSignatureConfirm = async () => {
   if (!signatureFormRef.value) return
-  
+  await signatureFormRef.value.validate()
+  signatureLoading.value = true
   try {
-    await signatureFormRef.value.validate()
-    signatureLoading.value = true
-    
-    // 更新个性签名到用户存储
-    userStore.updateUserInfo({
-      signature: signatureForm.signature
-    })
-    
-    ElMessage.success('个性签名更新成功')
-    editSignatureDialogVisible.value = false
-    signatureFormRef.value?.resetFields()
-  } catch (error) {
-    console.error('更新个性签名失败:', error)
-  } finally {
-    signatureLoading.value = false
-  }
+    userStore.updateUserInfo({ signature: signatureForm.signature })
+    ElMessage.success('签名更新成功！')
+    handleSignatureClose()
+  } catch(e) { console.error(e) } finally { signatureLoading.value = false }
 }
 
-// 修改密码相关函数
 const handleChangePassword = async () => {
   if (!passwordFormRef.value) return
-  
+  await passwordFormRef.value.validate()
+  passwordLoading.value = true
   try {
-    await passwordFormRef.value.validate()
-    passwordLoading.value = true
-    
-    // 调用修改密码API
-    const result = await request.post('/auth/change-password', {
+    const res = await request.post('/auth/change-password', {
       currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword
     })
-    
-    if (result.success) {
-      ElMessage.success('密码修改成功')
-      passwordFormRef.value?.resetFields()
+    if (res.success) {
+      ElMessage.success('密码修改成功，请牢记新密码！')
+      passwordFormRef.value.resetFields()
     } else {
-      ElMessage.error(result.error || '密码修改失败')
+      ElMessage.error(res.error || '修改失败')
     }
-  } catch (error: any) {
-    console.error('修改密码失败:', error)
-    ElMessage.error(error.response?.data?.error || '密码修改失败')
+  } catch(e: any) {
+    ElMessage.error(e.response?.data?.error || '修改失败')
   } finally {
     passwordLoading.value = false
   }
 }
 
-// 监听用户信息变化
-watch(() => userStore.userInfo, (newUserInfo) => {
-  if (newUserInfo) {
-    console.log('用户信息已更新:', newUserInfo)
-  }
-}, { immediate: true })
-
-// 生命周期
 onMounted(() => {
-  // 初始化用户状态
   userStore.initUser()
-  loadSettings()
 })
 </script>
 
 <style lang="scss" scoped>
-.settings-container {
-  height: 100%;
-  overflow-y: auto;
+/* --- Pop Art Palette --- */
+$bg-color: #FBF8F3;
+$dark: #1A1A1A;
+$yellow: #FFD93D;
+$blue: #4D96FF;
+$pink: #FF6B6B;
+$green: #6BCB77;
+$purple: #9B5DE5;
+
+.pop-layout {
+  min-height: 100vh;
+  background-color: $bg-color;
+  background-image: radial-gradient(#ddd 2px, transparent 2px);
+  background-size: 20px 20px;
+  padding: 30px;
+  font-family: 'Quicksand', 'Varela Round', sans-serif;
+  color: $dark;
 }
 
-.settings-card {
-  height: calc(100vh - 140px);
-  border: none;
-  border-radius: 16px;
-  overflow: hidden;
-
-  .card-header {
-    text-align: center;
-    
-    h2 {
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-      margin-bottom: 8px;
-    }
-    
-    p {
-      color: var(--el-text-color-secondary);
-      margin: 0;
-    }
-  }
-}
-
-.settings-content {
-  height: calc(100% - 120px);
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.settings-section {
-  margin-bottom: 32px;
-  width: 100%;
-  max-width: 800px;
+/* Header */
+.page-header {
+  margin-bottom: 40px;
   
-  .section-title {
-    display: flex;
+  .title-badge {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 50px;
+    font-weight: bold;
+    font-size: 14px;
+    background: white;
+    border: 2px solid $dark;
+    box-shadow: 3px 3px 0 $dark;
+    margin-bottom: 12px;
     
-    .el-icon {
-      font-size: 20px;
-      color: var(--el-color-primary);
-      margin-right: 8px;
-    }
+    &.pink { background: $pink; color: white; }
+  }
+  
+  .main-title {
+    font-size: 42px;
+    font-weight: 900;
+    margin: 0;
     
     span {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-    }
-  }
-  
-  .el-form {
-    max-width: 600px;
-    margin: 0 auto;
-    
-    .form-hint {
-      font-size: 12px;
-      color: var(--el-color-info);
-      margin-top: 4px;
-      line-height: 1.4;
+      color: $blue;
+      text-decoration: underline wavy $yellow 3px;
     }
   }
 }
 
-.user-profile {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
+/* Grid Layout */
+.bento-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  max-width: 1200px;
+}
+
+/* Base Pop Card */
+.pop-card {
+  background: white;
+  border: 3px solid $dark;
+  border-radius: 24px;
+  padding: 0;
+  box-shadow: 8px 8px 0 $dark;
+  position: relative;
+  overflow: hidden;
   
-  .user-avatar {
-    background-color: #409eff;
-    color: white;
-    font-size: 32px;
-    font-weight: 600;
+  .card-label {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 14px;
+    font-weight: 900;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 2px solid $dark;
+    z-index: 2;
+    
+    &.yellow { background: $yellow; transform: rotate(5deg); }
+    &.blue { background: $blue; color: white; transform: rotate(-3deg); }
+  }
+}
+
+/* --- Profile Card Styles --- */
+.profile-card {
+  display: flex;
+  flex-direction: column;
+
+  .card-deco-stripes {
+    height: 120px;
+    background: repeating-linear-gradient(
+      45deg,
+      $yellow,
+      $yellow 20px,
+      white 20px,
+      white 40px
+    );
+    border-bottom: 3px solid $dark;
   }
   
-  .user-info {
-    flex: 1;
+  .avatar-section {
+    margin-top: -60px;
+    display: flex;
+    justify-content: center;
+    position: relative;
+    
+    .avatar-frame {
+      position: relative;
+      
+      .pop-avatar {
+        border: 4px solid $dark;
+        background: white;
+        color: $dark;
+        font-size: 40px;
+        font-weight: 900;
+      }
+      
+      .edit-avatar-btn {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 32px;
+        height: 32px;
+        background: $pink;
+        border: 2px solid $dark;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        cursor: pointer;
+        transition: transform 0.2s;
+        
+        &:hover { transform: scale(1.1); }
+      }
+    }
+  }
+
+  .info-section {
+    padding: 30px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    
-    .info-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      
-      .username {
-        font-size: 20px;
-        font-weight: 600;
-        color: var(--el-text-color-primary);
+    gap: 24px;
+
+    .info-group {
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 900;
+        color: #999;
+        margin-bottom: 6px;
+        letter-spacing: 1px;
       }
       
-      .signature {
-        font-size: 14px;
-        color: var(--el-text-color-secondary);
-        line-height: 1.4;
-      }
-      
-      .inline-edit-btn {
-        padding: 4px;
-        color: var(--el-text-color-secondary);
+      .display-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: $bg-color;
+        border: 2px solid $dark;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-weight: bold;
+        position: relative;
         
-        &:hover {
-          color: var(--el-color-primary);
+        &.signature-box {
+          align-items: flex-start;
+          min-height: 80px;
+          background: #FFF8E1; /* Sticky note color */
+          .text { font-weight: 500; font-size: 14px; line-height: 1.5; }
+        }
+        
+        &.locked {
+          background: #E0E0E0;
+          color: #666;
+          justify-content: flex-start;
+          gap: 10px;
+          .lock-icon { margin-left: auto; opacity: 0.5; }
+        }
+
+        .icon-btn {
+          width: 30px;
+          height: 30px;
+          border: 2px solid $dark;
+          border-radius: 50%;
+          background: white;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          flex-shrink: 0;
+          margin-left: 10px;
+          
+          &:hover {
+            background: $blue;
+            color: white;
+            box-shadow: 2px 2px 0 $dark;
+          }
         }
       }
     }
   }
 }
 
-
-
-// 响应式设计
-@media (max-width: 768px) {
-  .settings-card {
-    border-radius: 0;
-    height: 100vh;
-  }
+/* --- Security Card Styles --- */
+.security-card {
+  padding: 40px;
+  background: white;
   
-  .settings-content {
-    padding: 16px;
-  }
-  
-  .settings-section {
-    margin-bottom: 24px;
+  .vault-header {
+    text-align: center;
+    margin-bottom: 30px;
     
-    .el-form {
-      max-width: 100%;
-      margin: 0 auto;
+    .vault-icon {
+      font-size: 40px;
+      color: $green;
+      margin-bottom: 10px;
+      filter: drop-shadow(3px 3px 0 $dark);
     }
+    
+    h3 { margin: 0; font-size: 24px; font-weight: 900; }
+    p { margin: 5px 0 0; color: #888; font-size: 14px; }
+  }
+
+  .form-actions {
+    margin-top: 30px;
+    
+    .save-btn {
+      width: 100%;
+      height: 50px;
+      background: $green;
+      color: $dark;
+      font-size: 16px;
+      
+      &:hover:not(:disabled) {
+        box-shadow: 6px 6px 0 $dark;
+        transform: translate(-2px, -2px);
+      }
+    }
+  }
+}
+
+/* --- Common Components --- */
+
+/* Input Override */
+:deep(.pop-input), :deep(.pop-textarea) {
+  .el-input__wrapper, .el-textarea__inner {
+    box-shadow: none !important;
+    border: 2px solid $dark;
+    border-radius: 12px;
+    background: white;
+    padding: 8px 16px;
+    transition: all 0.2s;
+    
+    &:focus, &.is-focus {
+      border-color: $dark;
+      box-shadow: 4px 4px 0 $blue !important;
+      transform: translate(-2px, -2px);
+    }
+  }
+  
+  .el-textarea__inner {
+    padding: 12px;
+  }
+}
+
+/* Button */
+.pop-btn {
+  border: 3px solid $dark;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: none !important;
+  }
+  
+  &:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    color: #888;
+  }
+}
+
+/* Dialog Styles */
+:deep(.pop-dialog) {
+  border-radius: 20px;
+  border: 4px solid $dark;
+  box-shadow: 10px 10px 0 rgba(0,0,0,0.2);
+  overflow: hidden;
+  
+  .el-dialog__header, .el-dialog__footer { display: none; }
+  .el-dialog__body { padding: 0; }
+  
+  .pop-dialog-header {
+    background: $yellow;
+    padding: 16px 20px;
+    border-bottom: 3px solid $dark;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .title { font-weight: 900; font-size: 18px; }
+    
+    .close-btn {
+      background: $pink;
+      border: 2px solid $dark;
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-weight: bold;
+      &:hover { transform: scale(1.1); }
+    }
+  }
+  
+  .pop-dialog-body {
+    padding: 30px;
+    background: white;
+  }
+  
+  .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    margin-top: 20px;
+    
+    .pop-btn {
+      padding: 10px 24px;
+      
+      &.cancel { background: white; &:hover { background: #eee; } }
+      &.confirm { background: $blue; color: white; &:hover { box-shadow: 4px 4px 0 $dark; } }
+    }
+  }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pop-card {
+    border-width: 2px;
+    box-shadow: 4px 4px 0 $dark;
   }
 }
 </style>

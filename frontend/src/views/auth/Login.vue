@@ -158,6 +158,8 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+@use "sass:color" as *;
+
 /* 定义波普风色板 */
 $pop-bg: #FBF8F3;       /* 米白背景 */
 $pop-dark: #1A1A1A;     /* 近乎黑的深灰 */
@@ -381,7 +383,7 @@ $pop-green: #6BCB77;    /* 清新绿 */
       margin-top: 10px;
       
       &:hover {
-        background: lighten($pop-dark, 10%);
+        background: color.lighten($pop-dark, 10%);
         transform: translate(-1px, -1px);
         box-shadow: 6px 6px 0px $pop-blue;
       }

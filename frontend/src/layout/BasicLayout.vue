@@ -1,23 +1,27 @@
 <template>
-  <div class="app-wrapper">
+  <div class="pop-layout-wrapper">
     <el-container class="layout-container">
-      <!-- 顶部导航栏（包含Logo和横向菜单） -->
-      <el-header class="top-header">
-        <div class="header-content">
-          <!-- Logo -->
-          <div class="logo-container">
-            <div class="logo-icon">🎬</div>
-            <span class="logo-text">AI-Anime漫改视频</span>
+      <!-- 顶部悬浮导航栏 -->
+      <el-header class="pop-header">
+        <div class="header-inner">
+          <!-- Logo Badge -->
+          <div class="logo-badge">
+            <div class="icon-box">🎬</div>
+            <span class="logo-text">AI-Anime</span>
+            <span class="beta-tag">BETA</span>
           </div>
           
-          <!-- 横向导航菜单 -->
-          <nav class="top-nav-menu">
+          <!-- 胶囊导航菜单 -->
+          <nav class="pop-nav">
             <router-link
-              v-for="item in menuItems"
+              v-for="(item, index) in menuItems"
               :key="item.path"
               :to="item.path"
-              class="nav-item"
-              :class="{ active: $route.path === item.path }"
+              class="nav-pill"
+              :class="[
+                { active: $route.path.startsWith(item.path) },
+                `color-${index % 4}` // 循环分配颜色类
+              ]"
             >
               <el-icon class="nav-icon">
                 <component :is="item.icon" />
@@ -26,28 +30,29 @@
             </router-link>
           </nav>
           
-          <!-- 用户菜单 -->
+          <!-- 用户胶囊 -->
           <div class="header-right">
-            <el-dropdown @command="handleUserCommand">
-              <div class="user-info">
-                <el-avatar :src="userInfo?.avatar" :size="32">
-                  {{ userInfo?.username?.charAt(0).toUpperCase() || 'U' }}
-                </el-avatar>
-                <span class="username">{{ userInfo?.username || '用户' }}</span>
-                <el-icon class="arrow-down">
-                  <ArrowDown />
-                </el-icon>
+            <el-dropdown 
+              @command="handleUserCommand" 
+              popper-class="pop-user-dropdown"
+              trigger="click"
+            >
+              <div class="user-capsule">
+                <div class="avatar-circle">
+                  <img v-if="userInfo?.avatar" :src="userInfo.avatar" />
+                  <span v-else>{{ userInfo?.username?.charAt(0).toUpperCase() || 'U' }}</span>
+                </div>
+                <span class="username">{{ userInfo?.username || 'Guest' }}</span>
+                <el-icon class="arrow-icon"><CaretBottom /></el-icon>
               </div>
               
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item divided command="logout">
-                    <el-icon><SwitchButton /></el-icon>
-                    退出登录
+                  <el-dropdown-item command="logout">
+                    <span class="pop-menu-item">🚪 退出登录</span>
                   </el-dropdown-item>
                   <el-dropdown-item command="clear-login">
-                    <el-icon><SwitchButton /></el-icon>
-                    清除登录状态(测试用)
+                    <span class="pop-menu-item">🧹 清除缓存</span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -57,9 +62,9 @@
       </el-header>
 
       <!-- 主内容区 -->
-      <el-main class="main-container">
+      <el-main class="pop-main">
         <router-view v-slot="{ Component, route }">
-          <transition name="fade-transform" mode="out-in">
+          <transition name="pop-bounce" mode="out-in">
             <component :is="Component" :key="route.path" />
           </transition>
         </router-view>
@@ -74,298 +79,305 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessageBox } from 'element-plus'
 import {
-  ArrowDown,
-  User,
-  Setting,
-  SwitchButton,
+  CaretBottom,
   House,
   Picture,
   VideoPlay,
   Microphone,
-  Clock
+  Clock,
+  Tools,
+  MagicStick
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-// 计算属性
 const userInfo = computed(() => userStore.userInfo)
 
-// 菜单项
+// 菜单配置
 const menuItems = [
-  {
-    path: '/dashboard',
-    title: '首页',
-    icon: House
-  },
-  {
-    path: '/txt2img',
-    title: '文字生成图片',
-    icon: Picture
-  },
-  {
-    path: '/img2img',
-    title: '图片生成图片',
-    icon: Picture
-  },
-  {
-    path: '/img2vid',
-    title: '图片生成视频',
-    icon: VideoPlay
-  },
-  {
-    path: '/tts',
-    title: '文字转语音',
-    icon: Microphone
-  },
-  {
-    path: '/history',
-    title: '历史记录',
-    icon: Clock
-  },
-  {
-    path: '/settings',
-    title: '设置',
-    icon: Setting
-  }
+  { path: '/dashboard', title: '首页', icon: House },
+  { path: '/txt2img', title: '文生图', icon: MagicStick }, // 换了个更魔幻的图标
+  { path: '/img2img', title: '图生图', icon: Picture },
+  { path: '/img2vid', title: '漫改视频', icon: VideoPlay },
+  { path: '/tts', title: '配音', icon: Microphone },
+  { path: '/history', title: '历史', icon: Clock },
+  { path: '/settings', title: '设置', icon: Tools }
 ]
 
-
-
-// 方法
 const handleUserCommand = async (command: string) => {
-  switch (command) {
-    case 'logout':
-      try {
-        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        })
-        userStore.logout()
-        router.push('/login')
-      } catch {
-        // 用户取消
-      }
-      break
-    case 'clear-login':
+  if (command === 'logout') {
+    try {
+      await ElMessageBox.confirm('准备开溜了吗？', '退出确认', {
+        confirmButtonText: '溜了溜了',
+        cancelButtonText: '再玩会',
+        type: 'warning',
+        // 自定义 Class 以匹配风格 (需要在全局样式定义，这里仅作示意)
+        customClass: 'pop-message-box' 
+      })
       userStore.logout()
-      // 清除所有存储
-      localStorage.clear()
       router.push('/login')
-      break
+    } catch {}
+  } else if (command === 'clear-login') {
+    userStore.logout()
+    localStorage.clear()
+    router.push('/login')
   }
 }
 </script>
 
-<style scoped>
-.app-wrapper {
-  position: relative;
-  height: 100%;
+<style lang="scss" scoped>
+/* --- Pop Art Palette --- */
+$bg-color: #FBF8F3;
+$dark: #1A1A1A;
+$yellow: #FFD93D;
+$blue: #4D96FF;
+$pink: #FF6B6B;
+$green: #6BCB77;
+$purple: #9B5DE5;
+
+.pop-layout-wrapper {
+  height: 100vh;
   width: 100%;
+  background-color: $bg-color;
+  /* 波点背景 */
+  background-image: radial-gradient(#E0E0E0 2px, transparent 2px);
+  background-size: 24px 24px;
+  overflow: hidden;
 }
 
 .layout-container {
-  height: 100vh;
-}
-
-.el-header {
-  padding: 0;
-  height: 80px; /* 增加高度以容纳横向导航 */
-}
-
-.top-header {
-  background-color: #fff;
-  border-bottom: 2px solid #e6e8eb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
   height: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+}
+
+/* --- Header Styling --- */
+.pop-header {
+  height: 80px;
   padding: 0 24px;
-  gap: 40px; /* 增加各部分间距 */
-}
-
-.logo-container {
+  z-index: 100;
   display: flex;
   align-items: center;
-  flex-shrink: 0; /* 防止Logo被压缩 */
-  
-  .logo-icon {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    margin-right: 12px;
-  }
-  
-  .logo-text {
-    font-size: 20px;
-    font-weight: 600;
-    color: #303133;
-  }
+  justify-content: center;
 }
 
-.top-nav-menu {
-  flex: 1;
+.header-inner {
+  width: 100%;
+  max-width: 1400px;
+  height: 60px;
+  background: white;
+  border: 3px solid $dark;
+  border-radius: 50px;
   display: flex;
   align-items: center;
-  gap: 8px; /* 导航项之间的间距 */
-  
-  .nav-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    color: #606266;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    border-radius: 8px;
-    font-size: 14px;
-    white-space: nowrap; /* 防止文字换行 */
-    
-    &:hover {
-      background-color: #f5f7fa;
-      color: #409eff;
-      transform: translateY(-2px);
-    }
-    
-    &.active {
-      background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
-    }
-    
-    .nav-icon {
-      font-size: 18px;
-      margin-right: 8px;
-      display: flex;
-      align-items: center;
-    }
-    
-    .nav-text {
-      font-weight: 500;
-    }
-  }
+  padding: 0 16px;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.1); /* 浮起感 */
+  justify-content: space-between;
 }
 
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px; /* 调整间距 */
-  flex-shrink: 0; /* 防止右侧元素被压缩 */
-}
-
-
-
-.user-info {
+/* Logo Badge */
+.logo-badge {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  border: 1px solid #e6e8eb;
+  background: $yellow;
+  padding: 6px 16px;
+  border-radius: 30px;
+  border: 2px solid $dark;
+  transform: rotate(-2deg); /* 俏皮的旋转 */
+  box-shadow: 2px 2px 0 $dark;
+  transition: transform 0.2s;
+  cursor: default;
   
   &:hover {
-    background: #f5f7fa;
-    border-color: #409eff;
-    box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+    transform: rotate(0deg) scale(1.05);
+  }
+
+  .icon-box { font-size: 20px; }
+  
+  .logo-text {
+    font-weight: 900;
+    font-size: 16px;
+    color: $dark;
+    letter-spacing: -0.5px;
+  }
+  
+  .beta-tag {
+    font-size: 10px;
+    background: $pink;
+    color: white;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid $dark;
+    font-weight: bold;
+  }
+}
+
+/* Navigation Pills */
+.pop-nav {
+  display: flex;
+  gap: 12px;
+  margin: 0 20px;
+  overflow-x: auto;
+  
+  /* 隐藏滚动条 */
+  &::-webkit-scrollbar { display: none; }
+
+  .nav-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    text-decoration: none;
+    color: $dark;
+    font-weight: 700;
+    font-size: 14px;
+    border: 2px solid transparent;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* 弹性动画 */
+    
+    .nav-icon { font-size: 18px; }
+
+    /* Hover State */
+    &:hover {
+      background: rgba(0,0,0,0.05);
+      transform: translateY(-2px);
+    }
+
+    /* Active State based on index color */
+    &.active {
+      border: 2px solid $dark;
+      color: white;
+      box-shadow: 3px 3px 0 $dark;
+      transform: translateY(-2px);
+      
+      &.color-0 { background: $blue; }
+      &.color-1 { background: $pink; }
+      &.color-2 { background: $green; }
+      &.color-3 { background: $purple; }
+    }
+  }
+}
+
+/* User Capsule */
+.user-capsule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 4px 4px;
+  border: 2px solid $dark;
+  border-radius: 30px;
+  cursor: pointer;
+  background: white;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #f0f0f0;
+    box-shadow: 2px 2px 0 $dark;
+  }
+
+  .avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: $dark;
+    color: $yellow;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid $dark;
+    overflow: hidden;
+    
+    img { width: 100%; height: 100%; object-fit: cover; }
   }
   
   .username {
+    font-weight: 800;
     font-size: 14px;
-    color: #303133;
-    font-weight: 500;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
-  .arrow-down {
-    font-size: 12px;
-    color: #909399;
-  }
+  .arrow-icon { font-size: 12px; color: #666; }
 }
 
-.main-container {
-  padding: 24px;
-  background-color: #f5f7fa;
-  min-height: calc(100vh - 80px); /* 减去顶部header高度 */
-}
-
-/* 过渡动画 */
-.fade-transform-enter-active,
-.fade-transform-leave-active {
-  transition: all 0.3s ease;
-}
-
-.fade-transform-enter-from {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.fade-transform-leave-to {
-  opacity: 0;
-  transform: translateY(-20px);
-}
-
-/* 响应式设计 */
-@media (max-width: 1200px) {
-  .header-content {
-    padding: 0 16px;
-    gap: 24px;
-  }
+/* --- Main Content --- */
+.pop-main {
+  padding: 10px 24px 24px; /* 顶部留少一点，因为 Header 是悬浮的 */
+  overflow-y: auto;
   
-  .top-nav-menu .nav-item {
-    padding: 10px 14px;
-    font-size: 13px;
+  /* 滚动条美化 */
+  &::-webkit-scrollbar { width: 8px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+    border: 2px solid $bg-color;
   }
+}
+
+/* --- Animations --- */
+.pop-bounce-enter-active {
+  animation: bounce-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pop-bounce-leave-active {
+  animation: fade-out 0.2s ease-in;
+}
+
+@keyframes bounce-in {
+  0% { opacity: 0; transform: scale(0.95) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* --- Responsive --- */
+@media (max-width: 1024px) {
+  .nav-text { display: none; } /* 平板模式隐藏文字，只留图标 */
+  .pop-nav .nav-pill { padding: 8px 12px; }
 }
 
 @media (max-width: 768px) {
-  .top-header {
-    height: auto;
+  .pop-header { padding: 0 10px; }
+  .header-inner { padding: 0 8px; height: 50px; }
+  
+  .logo-badge { 
+    padding: 4px 8px; 
+    .logo-text, .beta-tag { display: none; } /* 手机模式只留 Logo 图标 */
   }
   
-  .header-content {
-    flex-direction: column;
-    padding: 12px;
-    gap: 12px;
-  }
-  
-  .top-nav-menu {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 4px;
-  }
-  
-  .top-nav-menu .nav-item {
-    padding: 8px 12px;
-    font-size: 12px;
-  }
-  
-  .logo-container .logo-icon {
-    width: 28px;
-    height: 28px;
-    font-size: 20px;
-  }
-  
-  .logo-container .logo-text {
-    font-size: 16px;
-  }
-  
-  .header-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
+  .pop-nav { margin: 0 10px; gap: 4px; }
+  .user-capsule .username { display: none; }
+}
+</style>
 
+<!-- 下拉菜单样式需要全局定义，因为它是挂载在 body 上的 -->
+<style lang="scss">
+.pop-user-dropdown {
+  border: 3px solid #1A1A1A !important;
+  border-radius: 16px !important;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.1) !important;
+  overflow: hidden;
+  padding: 0 !important;
   
-  .main-container {
-    padding: 16px;
+  .el-dropdown-menu__item {
+    font-weight: bold !important;
+    padding: 10px 20px !important;
+    color: #1A1A1A !important;
+    
+    &:hover {
+      background-color: #FFD93D !important; /* 黄色高亮 */
+      color: #1A1A1A !important;
+    }
   }
+  
+  .el-popper__arrow { display: none !important; }
 }
 </style>

@@ -88,6 +88,18 @@ public/videos/*
 # Keep .gitkeep in videos folder (保留 .gitkeep 文件)
 !public/videos/.gitkeep
 
+# Ignore all images in public/images folder
+public/images/*.png
+public/images/*.jpg
+public/images/*.jpeg
+public/images/*.gif
+public/images/*.webp
+public/images/*.svg
+public/images/*.mp3
+public/images/*.wav
+public/images/*.mp4
+public/images/*.webm
+
 # OS generated files
 .DS_Store
 .DS_Store?

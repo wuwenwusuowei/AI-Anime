@@ -135,16 +135,15 @@ $green: #6BCB77;
 $purple: #9B5DE5;
 
 .pop-dashboard {
-  min-height: 100vh;
-  background-color: $bg-color;
-  /* 波点背景 */
-  background-image: radial-gradient(#E5E5E5 2px, transparent 2px);
-  background-size: 30px 30px;
+  min-height: calc(100vh - 80px); /* 减去header高度，填满剩余空间 */
+  height: 100%;
+  background-color: transparent;
   padding: 40px 20px;
   font-family: 'Quicksand', 'Varela Round', sans-serif;
   color: $dark;
   position: relative;
   overflow-x: hidden;
+  width: 100%;
 }
 
 /* 背景装饰几何体 */
@@ -281,7 +280,7 @@ $purple: #9B5DE5;
       transform: translate(6px, 6px);
     }
     .btn-shadow {
-      background: $dark; /* 按下时阴影变黑或看起来被压扁 */
+      background: $dark;
     }
   }
 }
@@ -289,11 +288,13 @@ $purple: #9B5DE5;
 /* Bento Grid */
 .bento-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 20px;
+  position: relative;
+  z-index: 1;
 }
 
 /* 卡片样式 */
@@ -301,11 +302,14 @@ $purple: #9B5DE5;
   background: white;
   border: 3px solid $dark;
   border-radius: 24px;
-  padding: 24px;
-  box-shadow: 8px 8px 0 $dark; /* 硬阴影 */
+  padding: 32px;
+  box-shadow: 8px 8px 0 $dark;
   transition: all 0.2s;
   position: relative;
   overflow: hidden;
+  min-height: 200px; /* 增加卡片最小高度 */
+  display: flex;
+  flex-direction: column;
 
   &:hover {
     transform: translateY(-4px);
@@ -316,17 +320,17 @@ $purple: #9B5DE5;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 
     .icon-box {
-      width: 50px;
-      height: 50px;
+      width: 60px;
+      height: 60px;
       border: 3px solid $dark;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 28px;
       color: $dark;
     }
 
@@ -342,16 +346,16 @@ $purple: #9B5DE5;
   }
 
   h3 {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 800;
-    margin: 0 0 10px;
+    margin: 0 0 12px;
   }
 
   p {
-    font-size: 14px;
+    font-size: 16px;
     color: #666;
-    line-height: 1.5;
-    margin: 0;
+    line-height: 1.6;
+    margin: auto 0 0 0;
     font-weight: 500;
   }
 
@@ -362,11 +366,11 @@ $purple: #9B5DE5;
   &.green-theme .icon-box { background: $green; }
   &.purple-theme .icon-box { background: $purple; color: white;}
   &.dark-theme {
-    background: $dark;
-    color: white;
-    .icon-box { background: white; color: $dark; }
-    h3 { color: white; }
-    p { color: #aaa; }
+    background: white;
+    color: $dark;
+    .icon-box { background: $yellow; color: $dark; }
+    h3 { color: $dark; }
+    p { color: #666; }
   }
 }
 
@@ -376,16 +380,22 @@ $purple: #9B5DE5;
 }
 
 /* 响应式适配 */
+@media (max-width: 1024px) {
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 32px;
   }
-  
+
   .bento-grid {
     grid-template-columns: 1fr;
     padding: 0;
   }
-  
+
   .hero-cta-btn {
     width: 100%;
     .btn-content {

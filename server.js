@@ -235,13 +235,81 @@ async function translatePrompt(userActionText, staticDescription, style) {
     直接输出一段通顺的英文段落。`;
 
     const completion = await zhipu.chat.completions.create({
-        model: "glm-4-flash", 
+        model: "glm-4-flash",
         messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: "开始编写" }
         ],
     });
     return completion.choices[0].message.content;
+}
+
+/**
+ * 文生图提示词优化助手
+ * 将用户的简单中文/英文输入转换为适合Flux模型的高质量英文提示词
+ */
+async function optimizePrompt(userPrompt, styleSuffix = "") {
+    console.log(`✨ [AI优化] 正在优化文生图提示词...`);
+    const systemPrompt = `你是一个专业的AI绘画提示词工程师，精通Flux模型。
+    请将用户的输入（可能是中文或简单的英文）改写为高质量的英文提示词。
+
+    优化原则：
+    1. **保留原意**：准确表达用户想要的主体和动作。
+    2. **增加细节**：补充光影、质感、构图、氛围等细节描述。
+    3. **自然语言**：Flux模型偏好自然语言描述，而非单纯的标签堆砌。
+    4. **风格融合**：如果用户指定了风格，请确保提示词契合该风格。
+
+    输出格式：直接输出一段英文提示词，不要包含解释或其他内容。`;
+
+    try {
+        const completion = await zhipu.chat.completions.create({
+            model: "glm-4-flash",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `用户输入: ${userPrompt}\n风格倾向: ${styleSuffix}` }
+            ]
+        });
+        return completion.choices[0].message.content;
+    } catch (e) {
+        console.error("❌ 提示词优化失败:", e);
+        return userPrompt + ", high quality" + styleSuffix;
+    }
+}
+
+/**
+ * 图生图分镜助手 (Kontext)
+ * 基于参考图和用户指令生成新的分镜描述提示词
+ */
+async function generateScenePrompt(userInstruction, refImageDesc) {
+    console.log(`🎬 [AI分镜] 正在生成分镜描述...`);
+    const systemPrompt = `你是一个专业的动漫分镜导演。
+    你的任务是基于一张[参考图]的人物设定，根据用户的[新指令]，构思一个新的画面分镜提示词。
+
+    输入信息：
+    1. 参考图描述：${refImageDesc}
+    2. 用户新指令：${userInstruction}
+
+    任务要求：
+    1. **保持一致性**：必须严格保留参考图中的人物核心特征（发色、发型、核心服饰特征），除非用户指令明确要求更换。
+    2. **执行指令**：根据用户的指令改变人物的动作、表情、视角或背景。
+    3. **场景构建**：用自然流畅的英文描写新的画面，包含环境光影和氛围。
+    4. **Kontext优化**：为Flux Kontext流程生成提示词，重点描述"发生了什么变化"。
+
+    输出格式：直接输出一段英文Prompt。`;
+
+    try {
+        const completion = await zhipu.chat.completions.create({
+            model: "glm-4-flash",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: "生成新分镜Prompt" }
+            ]
+        });
+        return completion.choices[0].message.content;
+    } catch (e) {
+        console.error("❌ 分镜生成失败:", e);
+        return `${userInstruction}, character from reference: ${refImageDesc}`;
+    }
 }
 
 /**
@@ -303,8 +371,8 @@ async function uploadImageToComfy(localFilePath, originalFilename) {
     }
 }
 
-// Flux 文生图触发函数
-async function triggerTxt2Img(prompt, ratio = "9:16", styleKey = "default") {
+// Flux 文生图触发函数 (已增强提示词优化)
+async function triggerTxt2Img(optimizedPrompt, ratio = "9:16", styleKey = "default") {
     console.log(`🎨 [Flux 文生图] 开始生成...`);
     const workflowPath = path.join(__dirname, 'Flux_Txt2Img_API.json');
     let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
@@ -315,19 +383,15 @@ async function triggerTxt2Img(prompt, ratio = "9:16", styleKey = "default") {
     const RESOLUTION_NODE = "4";
     const LORA_NODE = "10";
 
-    // 获取风格配置
     const styleConfig = STYLE_MAP[styleKey] || STYLE_MAP["default"];
     const ratioConfig = ASPECT_RATIOS[ratio] || ASPECT_RATIOS["9:16"];
     const seed = Math.floor(Math.random() * 1000000000000);
 
-    // 追加风格提示词后缀
-    const finalPrompt = prompt + styleConfig.prompt_suffix;
-
     console.log(`🔧 [配置] 风格: ${styleConfig.name} (${styleKey})`);
-    console.log(`🔧 [配置] 提示词: ${finalPrompt.substring(0, 50)}... | 画幅: ${ratio} (${ratioConfig.width}x${ratioConfig.height})`);
+    console.log(`🔧 [配置] 提示词: ${optimizedPrompt.substring(0, 50)}... | 画幅: ${ratio} (${ratioConfig.width}x${ratioConfig.height})`);
 
-    // 修改参数
-    workflow[PROMPT_NODE].inputs.text = finalPrompt;
+    // 修改参数 (使用已优化的Prompt)
+    workflow[PROMPT_NODE].inputs.text = optimizedPrompt;
     workflow[SEED_NODE].inputs.seed = seed;
     workflow[RESOLUTION_NODE].inputs.width = ratioConfig.width;
     workflow[RESOLUTION_NODE].inputs.height = ratioConfig.height;
@@ -360,34 +424,41 @@ async function triggerTxt2Img(prompt, ratio = "9:16", styleKey = "default") {
     return data.prompt_id;
 }
 
-// Flux 图生图触发函数 (Redux + PuLID)
-async function triggerImg2Img(prompt, ratio = "9:16", bodyFileName, faceFileName) {
-    console.log(`🎨 [Flux 图生图] 开始生成...`);
-    const workflowPath = path.join(__dirname, 'Flux_Img2Img_API.json');
+// Flux 图生图触发函数 (Kontext)
+async function triggerImg2Img(scenePrompt, ratio = "9:16", refImageName) {
+    console.log(`🎨 [Flux Kontext] 开始图生图...`);
+    const workflowPath = path.join(__dirname, 'flux_kontext_fp8.json');
     let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 
-    // 节点 ID 配置
-    const PROMPT_NODE = "2";
-    const SEED_NODE = "5";
-    const RESOLUTION_NODE = "4";
-    const BODY_IMAGE_NODE = "13"; // Redux 参考图 (全身)
-    const FACE_IMAGE_NODE = "24"; // PuLID 参考图 (脸部)
+    // 节点 ID 配置 (根据 flux_kontext_fp8.json)
+    const PROMPT_NODE = "6";         // CLIPTextEncode (Positive)
+    const SEED_NODE = "25";          // RandomNoise
+    const EMPTY_LATENT_NODE = "27";  // EmptySD3LatentImage (分辨率)
+    const MODEL_SAMPLING_NODE = "30"; // ModelSamplingFlux (也包含宽高，需要同步修改)
+    const LOAD_IMAGE_NODE = "41";    // LoadImage
 
     const ratioConfig = ASPECT_RATIOS[ratio] || ASPECT_RATIOS["9:16"];
     const seed = Math.floor(Math.random() * 1000000000000);
 
-    console.log(`🔧 [配置] 提示词: ${prompt.substring(0, 50)}... | 画幅: ${ratio} (${ratioConfig.width}x${ratioConfig.height})`);
-    console.log(`📷 [参考图] 全身: ${bodyFileName} | 脸部: ${faceFileName}`);
+    console.log(`🔧 [配置] 提示词: ${scenePrompt.substring(0, 50)}...`);
+    console.log(`📷 [参考图] ${refImageName} | 画幅: ${ratio}`);
 
     // 修改参数
-    workflow[PROMPT_NODE].inputs.text = prompt;
-    workflow[SEED_NODE].inputs.seed = seed;
-    workflow[RESOLUTION_NODE].inputs.width = ratioConfig.width;
-    workflow[RESOLUTION_NODE].inputs.height = ratioConfig.height;
-    workflow[BODY_IMAGE_NODE].inputs.image = bodyFileName;
-    workflow[FACE_IMAGE_NODE].inputs.image = faceFileName;
+    workflow[PROMPT_NODE].inputs.text = scenePrompt;
+    workflow[SEED_NODE].inputs.noise_seed = seed;
 
-    console.log(`🚀 [触发] 发送图生图任务... 种子: ${seed}`);
+    // 设置分辨率 (Kontext工作流中有两处需要设置宽高)
+    workflow[EMPTY_LATENT_NODE].inputs.width = ratioConfig.width;
+    workflow[EMPTY_LATENT_NODE].inputs.height = ratioConfig.height;
+    if (workflow[MODEL_SAMPLING_NODE]) {
+        workflow[MODEL_SAMPLING_NODE].inputs.width = ratioConfig.width;
+        workflow[MODEL_SAMPLING_NODE].inputs.height = ratioConfig.height;
+    }
+
+    // 设置参考图
+    workflow[LOAD_IMAGE_NODE].inputs.image = refImageName;
+
+    console.log(`🚀 [触发] 发送Kontext任务... 种子: ${seed}`);
 
     const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
         method: 'POST',
@@ -1042,7 +1113,7 @@ app.get('/api/auth/me', async (req, res) => {
     }
 });
 
-// Flux 文生图接口
+// Flux 文生图接口 (集成提示词优化)
 app.post('/api/generate/txt2img', async (req, res) => {
     try {
         const { prompt, ratio, style } = req.body;
@@ -1051,8 +1122,9 @@ app.post('/api/generate/txt2img', async (req, res) => {
             return res.status(400).json({ error: "请提供提示词" });
         }
 
-        console.log(`\n🆕 Flux 文生图任务: ${prompt}, 画幅: ${ratio || '9:16'}, 风格: ${style || 'default'}`);
+        console.log(`\n🆕 [文生图] 收到任务: ${prompt}`);
 
+        // 创建任务记录
         const task = await prisma.videoTask.create({
             data: {
                 userPrompt: prompt,
@@ -1067,16 +1139,25 @@ app.post('/api/generate/txt2img', async (req, res) => {
         // 异步执行任务
         (async () => {
             try {
-                const promptId = await triggerTxt2Img(prompt, ratio || '9:16', style || 'default');
+                // 1. 优化提示词
+                const styleConfig = STYLE_MAP[style || 'default'];
+                const optimizedPrompt = await optimizePrompt(prompt, styleConfig.prompt_suffix);
+
+                // 保存翻译后的提示词
+                await prisma.videoTask.update({
+                    where: { id: task.id },
+                    data: { translatedPrompt: optimizedPrompt }
+                });
+
+                // 2. 触发 ComfyUI
+                const promptId = await triggerTxt2Img(optimizedPrompt, ratio || '9:16', style || 'default');
 
                 await prisma.videoTask.update({
                     where: { id: task.id },
                     data: { status: 'PROCESSING', promptId: promptId }
                 });
-
-                console.log(`✅ [文生图] 任务 ${task.id} 已发送到 ComfyUI`);
             } catch (err) {
-                console.error(`❌ [文生图] 任务 ${task.id} 失败:`, err.message);
+                console.error(`❌ [文生图] 失败:`, err);
                 await prisma.videoTask.update({
                     where: { id: task.id },
                     data: { status: 'FAILED' }
@@ -1089,33 +1170,32 @@ app.post('/api/generate/txt2img', async (req, res) => {
     }
 });
 
-// Flux 图生图接口 (Redux + PuLID)
+// Flux 图生图接口 (Kontext + 分镜助手)
+// 前端可能还是传 imageBody 和 imageFace，这里为了兼容只取 imageBody
 app.post('/api/generate/img2img', upload.fields([
     { name: 'imageBody', maxCount: 1 },
     { name: 'imageFace', maxCount: 1 }
 ]), async (req, res) => {
     try {
         const { prompt, ratio } = req.body;
-        const bodyFile = req.files?.imageBody?.[0];
-        const faceFile = req.files?.imageFace?.[0];
+        const refImage = req.files?.imageBody?.[0]; // 只需要一张主参考图
 
-        if (!bodyFile || !faceFile) {
-            return res.status(400).json({ error: "请上传全身参考图和脸部参考图" });
+        if (!refImage) {
+            return res.status(400).json({ error: "请至少上传一张参考图(imageBody)" });
         }
 
         if (!prompt) {
-            return res.status(400).json({ error: "请提供提示词" });
+            return res.status(400).json({ error: "请提供分镜描述或动作指令" });
         }
 
-        console.log(`\n🆕 Flux 图生图任务: ${prompt}, 画幅: ${ratio || '9:16'}`);
+        console.log(`\n🆕 [Kontext 图生图] 收到任务: ${prompt}`);
 
         const task = await prisma.videoTask.create({
             data: {
                 userPrompt: prompt,
                 type: 'IMG2IMG',
                 status: 'PENDING',
-                refImageBody: bodyFile.path,
-                refImageFace: faceFile.path
+                refImageBody: refImage.path // 记录参考图路径
             }
         });
 
@@ -1124,31 +1204,45 @@ app.post('/api/generate/img2img', upload.fields([
         // 异步执行任务
         (async () => {
             try {
-                // 上传两张参考图到 ComfyUI
-                const bodyCloudName = await uploadImageToComfy(bodyFile.path, bodyFile.originalname);
-                const faceCloudName = await uploadImageToComfy(faceFile.path, faceFile.originalname);
+                // 1. 上传参考图
+                const cloudName = await uploadImageToComfy(refImage.path, refImage.originalname);
 
-                const promptId = await triggerImg2Img(prompt, ratio || '9:16', bodyCloudName, faceCloudName);
+                // 2. 视觉分析 (提取参考图特征)
+                const refFeatures = await analyzeImageFeatures(refImage.path);
+
+                // 3. 生成分镜提示词 (结合用户指令 + 参考图特征)
+                const scenePrompt = await generateScenePrompt(prompt, refFeatures);
+
+                await prisma.videoTask.update({
+                    where: { id: task.id },
+                    data: { translatedPrompt: scenePrompt }
+                });
+
+                // 4. 触发 Kontext 工作流
+                const promptId = await triggerImg2Img(scenePrompt, ratio || '9:16', cloudName);
 
                 await prisma.videoTask.update({
                     where: { id: task.id },
                     data: { status: 'PROCESSING', promptId: promptId }
                 });
 
-                console.log(`✅ [图生图] 任务 ${task.id} 已发送到 ComfyUI`);
+                // 清理
+                if (fs.existsSync(refImage.path)) fs.unlinkSync(refImage.path);
+                if (req.files?.imageFace?.[0]?.path && fs.existsSync(req.files.imageFace[0].path)) {
+                    fs.unlinkSync(req.files.imageFace[0].path);
+                }
 
-                // 清理上传的临时文件
-                if (fs.existsSync(bodyFile.path)) fs.unlinkSync(bodyFile.path);
-                if (fs.existsSync(faceFile.path)) fs.unlinkSync(faceFile.path);
             } catch (err) {
-                console.error(`❌ [图生图] 任务 ${task.id} 失败:`, err.message);
+                console.error(`❌ [Kontext] 失败:`, err);
                 await prisma.videoTask.update({
                     where: { id: task.id },
                     data: { status: 'FAILED' }
                 });
                 // 清理临时文件
-                if (fs.existsSync(bodyFile.path)) fs.unlinkSync(bodyFile.path);
-                if (fs.existsSync(faceFile.path)) fs.unlinkSync(faceFile.path);
+                if (fs.existsSync(refImage.path)) fs.unlinkSync(refImage.path);
+                if (req.files?.imageFace?.[0]?.path && fs.existsSync(req.files.imageFace[0].path)) {
+                    fs.unlinkSync(req.files.imageFace[0].path);
+                }
             }
         })();
     } catch (error) {

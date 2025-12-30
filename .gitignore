@@ -82,6 +82,11 @@ prisma/migrations/
 uploads/
 temp/
 
+# Audio files (TTS生成的音频)
+public/audio/*.mp3
+public/audio/*.wav
+public/audio/*.ogg
+
 # Generated videos (忽略生成的视频文件夹)
 public/videos/*
 

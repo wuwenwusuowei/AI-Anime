@@ -152,15 +152,17 @@
           
           <!-- 屏幕区域 -->
           <div class="tv-screen" :class="{ 'has-video': generatedVideo }">
-            
+
             <!-- 状态A: 播放视频 -->
             <video
               v-if="generatedVideo"
+              :key="generatedVideo"
               :src="generatedVideo"
               controls
               autoplay
               loop
               class="final-video"
+              @error="handleVideoError"
             ></video>
 
             <!-- 状态B: 生成中 -->
@@ -322,19 +324,27 @@ const handleGenerate = async () => {
 
 const startPolling = (id: number) => {
   if (pollingTimer) clearInterval(pollingTimer)
-  
+
   pollingTimer = setInterval(async () => {
     try {
       // 模拟进度条增长 (为了视觉效果)
       if (progress.value < 90) progress.value += Math.random() * 5
-      
+
       const response = await fetch(`http://localhost:3000/api/status/${id}`)
       const data = await response.json()
-      
+
       if (data.status === 'COMPLETED') {
         clearInterval(pollingTimer)
         progress.value = 100
-        generatedVideo.value = data.videoUrl
+        // 使用 resultUrl 而不是 videoUrl（后端返回的字段名）
+        const videoUrl = data.resultUrl || data.videoUrl
+        if (videoUrl) {
+          generatedVideo.value = videoUrl
+          console.log('✅ 视频URL:', videoUrl)
+        } else {
+          console.error('❌ 未收到视频URL:', data)
+          ElMessage.error('视频URL错误')
+        }
         isGenerating.value = false
         ElMessage.success('视频生成成功！')
       } else if (data.status === 'FAILED') {
@@ -361,6 +371,12 @@ const downloadVideo = () => {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+}
+
+// 视频加载错误处理
+const handleVideoError = (e: Event) => {
+  console.error('❌ 视频加载失败:', e)
+  ElMessage.error('视频加载失败，请检查URL是否正确')
 }
 </script>
 
@@ -750,8 +766,9 @@ $red: #FF6B6B;
       .noise-bg {
         position: absolute;
         top: 0; left: 0; width: 100%; height: 100%;
-        background-image: url('data:image/svg+xml;base64,...'); /* 可选：噪点图 */
-        opacity: 0.1;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+        background-size: 4px 4px;
+        opacity: 0.3;
       }
       .standby-content {
         text-align: center;

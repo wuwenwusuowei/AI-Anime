@@ -91,11 +91,12 @@
       </div>
 
       <!-- 6. 流程 -->
-      <div class="pop-card dark-theme">
+      <div class="pop-card blue-theme">
         <div class="card-header">
           <div class="icon-box">
             <el-icon><Odometer /></el-icon>
           </div>
+          <span class="step-tag">EXTRA</span>
         </div>
         <h3>一站式搞定</h3>
         <p>无需切换软件，这里就是你的动漫制作工作室。</p>

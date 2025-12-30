@@ -172,7 +172,7 @@ const audioSize = ref('')
 
 const ttsForm = reactive({
   text: '',
-  voiceType: 'female-shaonv',
+  voiceType: 'zhang-miss',
   language: 'zh-CN',
   speed: 1.0,
   volume: 80,
@@ -211,13 +211,34 @@ onMounted(() => {
 
 // 模拟 API 加载音色
 const loadVoiceTypes = () => {
-  // 模拟数据
+  // 音色列表
   voiceTypes.value = [
-    { id: 'female-shaonv', name: '元气少女', gender: '女' },
-    { id: 'female-shuqin', name: '温柔学姐', gender: '女' },
-    { id: 'male-kongshao', name: '港式空少', gender: '男' },
-    { id: 'male-qingchun', name: '热血少年', gender: '男' },
-    { id: 'en-girl', name: 'Jenny (En)', gender: '女' },
+    { id: 'zhang-miss', name: '嚣张小姐', gender: '女' },
+    { id: 'bujiji-qingnian', name: '不羁青年', gender: '男' },
+    { id: 'aojiao-yujie', name: '傲娇御姐', gender: '女' },
+    { id: 'shulang-nan', name: '舒朗男声', gender: '男' },
+    { id: 'rexin-dashen', name: '热心大婶', gender: '女' },
+    { id: 'gaoxiao-daye', name: '搞笑大爷', gender: '男' },
+    { id: 'wenrun-nan', name: '温润男声', gender: '男' },
+    { id: 'wennuan-guimi', name: '温暖闺蜜', gender: '女' },
+    { id: 'xinwen-nv', name: '新闻女声', gender: '女' },
+    { id: 'chenwen-gaoguan', name: '沉稳高管', gender: '男' },
+    { id: 'tianmei-nv', name: '甜美女声', gender: '女' },
+    { id: 'nanfang-xiaoge', name: '南方小哥', gender: '男' },
+    { id: 'wenrun-qingnian', name: '温润青年', gender: '男' },
+    { id: 'yueli-jiejie', name: '阅历姐姐', gender: '女' },
+    { id: 'wenrou-shaonv', name: '温柔少女', gender: '女' },
+    { id: 'huajia-nainai', name: '花甲奶奶', gender: '女' },
+    { id: 'hanhan-mengshou', name: '憨憨萌兽', gender: '女' },
+    { id: 'diantai-nanzhubo', name: '电台男主播', gender: '男' },
+    { id: 'shuqing-nan', name: '抒情男声', gender: '男' },
+    { id: 'lvzhen-didi', name: '率真弟弟', gender: '男' },
+    { id: 'zhencheng-qingnian', name: '真诚青年', gender: '男' },
+    { id: 'wenrou-xuejie', name: '温柔学姐', gender: '女' },
+    { id: 'zuiying-zhuma', name: '嘴硬竹马', gender: '男' },
+    { id: 'qingcui-shaonv', name: '清脆少女', gender: '女' },
+    { id: 'qingche-didi', name: '清澈邻家弟弟', gender: '男' },
+    { id: 'nanfang-ruanruan', name: '南方软软女孩', gender: '女' },
   ]
 }
 
@@ -226,31 +247,43 @@ const estimatedDuration = computed(() => Math.ceil(ttsForm.text.trim().length / 
 
 const generateTTS = async () => {
   if (!ttsForm.text.trim()) return ElMessage.warning('请先输入台词哦！')
-  
+
   generating.value = true
   audioUrl.value = '' // 重置
-  
-  // 模拟 API 调用延迟
-  setTimeout(() => {
-    // 模拟生成成功
-    // 这里放一个真实的短音频 Base64 用于演示效果
-    audioUrl.value = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA' 
-    // 上面这个太短听不见，实际会用真实URL。
-    // 为了演示界面效果，假设生成成功：
-    // 在实际代码中，这里保留你原来的 fetch 逻辑即可
-    
-    // 模拟失败（随机演示）或成功
-    if (Math.random() > 0.1) {
-       // 模拟一个较长的音频占位
-       audioUrl.value = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' 
-       ElMessage.success('合成完毕！快去试听吧 🎵')
+
+  try {
+    console.log('🎤 [TTS] 开始生成语音:', ttsForm.text.substring(0, 30) + '...')
+
+    const response = await fetch('http://localhost:3000/api/tts/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: ttsForm.text,
+        voiceType: ttsForm.voiceType,
+        language: ttsForm.language,
+        speed: ttsForm.speed,
+        volume: ttsForm.volume,
+        outputFormat: ttsForm.outputFormat
+      })
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      audioUrl.value = data.audioUrl
+      audioDuration.value = data.duration || 0
+      audioSize.value = (data.fileSize / 1024).toFixed(1) + ' KB'
+      ElMessage.success('语音合成完成！🎉')
     } else {
-       ElMessage.error('糟糕，AI 偷懒了，请重试')
+      ElMessage.error(data.error || '生成失败')
     }
-    
+  } catch (error: any) {
+    console.error('❌ [TTS] 生成失败:', error)
+    ElMessage.error(error.message || '网络错误，请重试')
+  } finally {
     generating.value = false
     saveState()
-  }, 1500)
+  }
 }
 
 const onAudioLoaded = () => {

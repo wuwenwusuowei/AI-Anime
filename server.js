@@ -277,11 +277,15 @@ async function optimizePrompt(userPrompt, styleSuffix = "") {
 }
 
 /**
- * 图生图分镜助手 (Kontext)
+ * 图生图分镜助手 (优化版 - 强化镜头语言)
  * 基于参考图和用户指令生成新的分镜描述提示词
  */
 async function generateScenePrompt(userInstruction, refImageDesc) {
     console.log(`🎬 [AI分镜] 正在生成分镜描述...`);
+
+    // 提取核心特征（发色、发型、服饰），不包含姿势
+    const coreFeatures = refImageDesc.split(',').slice(0, 5).join(',');
+
     const systemPrompt = `你是一个专业的动漫分镜导演。
     你的任务是基于一张[参考图]的人物设定，根据用户的[新指令]，构思一个新的画面分镜提示词。
 
@@ -289,26 +293,32 @@ async function generateScenePrompt(userInstruction, refImageDesc) {
     1. 参考图描述：${refImageDesc}
     2. 用户新指令：${userInstruction}
 
-    任务要求：
-    1. **保持一致性**：必须严格保留参考图中的人物核心特征（发色、发型、核心服饰特征），除非用户指令明确要求更换。
-    2. **执行指令**：根据用户的指令改变人物的动作、表情、视角或背景。
-    3. **场景构建**：用自然流畅的英文描写新的画面，包含环境光影和氛围。
-    4. **Kontext优化**：为Flux Kontext流程生成提示词，重点描述"发生了什么变化"。
+    ⚠️ 核心规则 (CRITICAL):
+    1. **强制改变构图**：如果用户指令包含"俯视"、"仰视"、"全身"等词，必须在 Prompt 开头加入强烈的镜头语言 (e.g., "High angle shot from above", "Bird's eye view", "Dynamic foreshortening", "Low angle shot", "Dutch angle")。
+    2. **打破原有姿势**：不要死板地描述参考图的动作（如捧着花），除非用户要求保留。根据新指令重新设计动作。
+    3. **保留特征**：只保留人物核心特征（${coreFeatures}... 发色、服饰风格），不要保留姿势。
+    4. **权重强化**：对关键镜头词使用权重，例如 "(High angle shot:1.5), (Bird's eye view:1.4)"。
 
-    输出格式：直接输出一段英文Prompt。`;
+    输出格式：直接输出一段英文 Prompt，包含：[镜头视角:1.2-1.5] + [环境光影] + [人物动作与表情] + [人物外观特征] + [风格]，使用括号()强化关键元素。`;
 
     try {
         const completion = await zhipu.chat.completions.create({
             model: "glm-4-flash",
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: "生成新分镜Prompt" }
+                { role: "user", content: "生成新分镜 Prompt" }
             ]
         });
         return completion.choices[0].message.content;
     } catch (e) {
         console.error("❌ 分镜生成失败:", e);
-        return `${userInstruction}, character from reference: ${refImageDesc}`;
+        // 保底 Prompt 也加上高视角词和权重
+        const enhancedInstruction = userInstruction.includes('俯视') || userInstruction.includes('天上')
+            ? `(High angle shot:1.5), (Bird's eye view:1.4), looking down from above`
+            : userInstruction.includes('仰视') || userInstruction.includes('地下')
+            ? `(Low angle shot:1.5), (Worm's eye view:1.4), looking up from below`
+            : 'cinematic lighting, dynamic angle';
+        return `${enhancedInstruction}, ${userInstruction}, character features from: ${coreFeatures}`;
     }
 }
 
@@ -493,13 +503,25 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
         workflow[PAINTER_NODE].inputs.width = resConfig.width;
         workflow[PAINTER_NODE].inputs.height = resConfig.height;
         workflow[PAINTER_NODE].inputs.length = targetFrames;
+        console.log(`✅ [Painter节点] 设置: ${resConfig.width}x${resConfig.height}, ${targetFrames}帧`);
     }
     if (workflow[RESIZE_NODE]) {
         workflow[RESIZE_NODE].inputs.width = resConfig.width;
         workflow[RESIZE_NODE].inputs.height = resConfig.height;
+        // 移除 device: "cpu"，使用默认设备
+        if (workflow[RESIZE_NODE].inputs.device) {
+            delete workflow[RESIZE_NODE].inputs.device;
+        }
+        console.log(`✅ [Resize节点] 设置: ${resConfig.width}x${resConfig.height}`);
     }
-    if (workflow[TEXT_NODE]) workflow[TEXT_NODE].inputs.text = positivePrompt;
-    if (workflow[IMAGE_NODE]) workflow[IMAGE_NODE].inputs.image = cloudImageName;
+    if (workflow[TEXT_NODE]) {
+        workflow[TEXT_NODE].inputs.text = positivePrompt;
+        console.log(`✅ [文本节点] Prompt长度: ${positivePrompt.length}字符`);
+    }
+    if (workflow[IMAGE_NODE]) {
+        workflow[IMAGE_NODE].inputs.image = cloudImageName;
+        console.log(`✅ [图像节点] 图片: ${cloudImageName}`);
+    }
 
     // 随机种子
     const randomSeed = Math.floor(Math.random() * 1000000000000);
@@ -508,42 +530,54 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
     });
 
     console.log(`🚀 [触发] 发送任务... 种子: ${randomSeed}`);
-    
+
     const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: workflow })
     });
 
-    if (!response.ok) throw new Error(`ComfyUI Error: ${response.statusText}`);
+    if (!response.ok) {
+        // 获取详细错误信息
+        const errorText = await response.text();
+        console.error('❌ [ComfyUI错误] 响应:', errorText);
+        throw new Error(`ComfyUI Error: ${response.statusText} - ${errorText}`);
+    }
     const data = await response.json();
     return data.prompt_id;
 }
 
 // --- 4. TTS API 路由 ---
 
-// Minimax TTS 音色映射配置（根据文档中的音色ID）
+// Minimax TTS 音色映射配置
 const MINIMAX_VOICE_MAPPING = {
-    // 中文音色（根据文档示例）
-    'female-shaonv': 'moss_audio_ce44fc67-7ce3-11f0-8de5-96e35d26fb85',     // 少女音
-    'female-qianxi': 'moss_audio_aaa1346a-7ce7-11f0-8e61-2e6e3c7ee85d',     // 温柔女声  
-    'female-chengshu': 'Chinese (Mandarin)_Lyrical_Voice',                   // 成熟女声
-    'male-qingnian': 'Chinese (Mandarin)_HK_Flight_Attendant',              // 青年男声
-    'male-wennuan': 'male-qn-qingse',                                        // 温暖男声（文档示例）
-    'male-laoren': 'moss_audio_6dc281eb-713c-11f0-a447-9613c873494c',      // 老年男声
-    'child-tong': 'moss_audio_570551b1-735c-11f0-b236-0adeeecad052',       // 童声
-    'female-yujie': 'English_Graceful_Lady',                                 // 御姐音
-    
-    // 英文音色
-    'english-female': 'English_radiant_girl',
-    'english-male': 'English_Persuasive_Man',
-    
-    // 日文音色
-    'japanese-female': 'Japanese_Whisper_Belle',
-    
-    // 🔧 自定义音色映射：
-    // 请根据你的Minimax API实际支持的音色ID修改这里的映射
-    // 可使用查询可用音色API获取完整列表
+    // 自定义音色映射
+    'zhang-miss': 'Arrogant_Miss',    // 嚣张小姐
+    'bujiji-qingnian': 'Chinese (Mandarin)_Unrestrained_Young_Man',    // 不羁青年
+    'aojiao-yujie': 'Chinese (Mandarin)_Mature_Woman',    // 傲娇御姐
+    'shulang-nan': 'hunyin_6',    // 舒朗男声
+    'rexin-dashen': 'Chinese (Mandarin)_Kind-hearted_Antie',    // 热心大婶
+    'gaoxiao-daye': 'Chinese (Mandarin)_Humorous_Elder',    // 搞笑大爷
+    'wenrun-nan': 'Chinese (Mandarin)_Gentleman',    // 温润男声
+    'wennuan-guimi': 'Chinese (Mandarin)_Warm_Bestie',    // 温暖闺蜜
+    'xinwen-nv': 'Chinese (Mandarin)_News_Anchor',    // 新闻女声
+    'chenwen-gaoguan': 'Chinese (Mandarin)_Reliable_Executive',    // 沉稳高管
+    'tianmei-nv': 'Chinese (Mandarin)_Sweet_Lady',    // 甜美女声
+    'nanfang-xiaoge': 'Chinese (Mandarin)_Southern_Young_Man',    // 南方小哥
+    'wenrun-qingnian': 'Chinese (Mandarin)_Gentle_Youth',    // 温润青年
+    'yueli-jiejie': 'Chinese (Mandarin)_Wise_Women',    // 阅历姐姐
+    'wenrou-shaonv': 'Chinese (Mandarin)_Warm_Girl',    // 温柔少女
+    'huajia-nainai': 'Chinese (Mandarin)_Kind-hearted_Elder',    // 花甲奶奶
+    'hanhan-mengshou': 'Chinese (Mandarin)_Cute_Spirit',    // 憨憨萌兽
+    'diantai-nanzhubo': 'Chinese (Mandarin)_Radio_Host',    // 电台男主播
+    'shuqing-nan': 'Chinese (Mandarin)_Lyrical_Voice',    // 抒情男声
+    'lvzhen-didi': 'Chinese (Mandarin)_Straightforward_Boy',    // 率真弟弟
+    'zhencheng-qingnian': 'Chinese (Mandarin)_Sincere_Adult',    // 真诚青年
+    'wenrou-xuejie': 'Chinese (Mandarin)_Gentle_Senior',    // 温柔学姐
+    'zuiying-zhuma': 'Chinese (Mandarin)_Stubborn_Friend',    // 嘴硬竹马
+    'qingcui-shaonv': 'Chinese (Mandarin)_Crisp_Girl',    // 清脆少女
+    'qingche-didi': 'Chinese (Mandarin)_Pure-hearted_Boy',    // 清澈邻家弟弟
+    'nanfang-ruanruan': 'Chinese (Mandarin)_Soft_Girl',    // 南方软软女孩
 };
 
 // 调用Minimax TTS API（根据文档API规范重构）

@@ -228,7 +228,7 @@ const passwordRules = {
   newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }, { min: 6, max: 20, message: '长度 6-20 位', trigger: 'blur' }],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
-    { validator: (r:any, v:string, cb:Function) => v !== passwordForm.newPassword ? cb(new Error('密码不一致')) : cb(), trigger: 'blur' }
+    { validator: (_:any, v:string, cb:Function) => v !== passwordForm.newPassword ? cb(new Error('密码不一致')) : cb(), trigger: 'blur' }
   ]
 }
 
@@ -288,11 +288,11 @@ const handleChangePassword = async () => {
       currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword
     })
-    if (res.success) {
+    if (res.data.success) {
       ElMessage.success('密码修改成功，请牢记新密码！')
       passwordFormRef.value.resetFields()
     } else {
-      ElMessage.error(res.error || '修改失败')
+      ElMessage.error(res.data.error || '修改失败')
     }
   } catch(e: any) {
     ElMessage.error(e.response?.data?.error || '修改失败')
@@ -318,9 +318,7 @@ $purple: #9B5DE5;
 
 .pop-layout {
   min-height: 100vh;
-  background-color: $bg-color;
-  background-image: radial-gradient(#ddd 2px, transparent 2px);
-  background-size: 20px 20px;
+  background-color: transparent;
   padding: 30px;
   font-family: 'Quicksand', 'Varela Round', sans-serif;
   color: $dark;
@@ -364,6 +362,7 @@ $purple: #9B5DE5;
   grid-template-columns: 1fr 1fr;
   gap: 30px;
   max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* Base Pop Card */

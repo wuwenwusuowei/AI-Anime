@@ -12,58 +12,34 @@
     <div class="workspace">
       <!-- 左侧：操作台 -->
       <div class="control-panel">
-        
-        <!-- 1. 双图上传区 (核心交互) -->
+
+        <!-- 1. 单图上传区 (Kontext工作流) -->
         <div class="panel-section">
           <div class="section-label">
             <el-icon><Files /></el-icon> 素材上传
           </div>
-          
+
           <div class="upload-grid">
-            <!-- 全身参考图 -->
-            <div class="upload-card body-card" @click="triggerBodyUpload">
-              <div class="card-header-tag blue">全身参考 (Redux)</div>
-              <div class="preview-area" :class="{ 'has-image': bodyPreviewUrl }">
+            <!-- 参考图 -->
+            <div class="upload-card main-card" @click="triggerUpload">
+              <div class="card-header-tag blue">Kontext 参考图</div>
+              <div class="preview-area" :class="{ 'has-image': previewUrl }">
                 <input
                   type="file"
-                  ref="bodyFileInput"
-                  @change="handleBodyFileChange"
+                  ref="fileInput"
+                  @change="handleFileChange"
                   accept="image/*"
                   hidden
                 >
-                <img v-if="bodyPreviewUrl" :src="bodyPreviewUrl" class="preview-img" />
+                <img v-if="previewUrl" :src="previewUrl" class="preview-img" />
                 <div v-else class="placeholder">
                   <div class="icon-circle blue-bg"><el-icon><User /></el-icon></div>
-                  <p>点击上传全身照</p>
-                  <span>用于锁定衣服/风格</span>
+                  <p>点击上传参考图</p>
+                  <span>用于保持角色一致性</span>
                 </div>
-                
+
                 <!-- 删除按钮 -->
-                <button v-if="bodyPreviewUrl" class="delete-btn" @click.stop="clearBodyImage">×</button>
-              </div>
-            </div>
-
-            <!-- 连接符 -->
-            <div class="plus-sign">+</div>
-
-            <!-- 脸部参考图 -->
-            <div class="upload-card face-card" @click="triggerFaceUpload">
-              <div class="card-header-tag pink">脸部特写 (PuLID)</div>
-              <div class="preview-area" :class="{ 'has-image': facePreviewUrl }">
-                <input
-                  type="file"
-                  ref="faceFileInput"
-                  @change="handleFaceFileChange"
-                  accept="image/*"
-                  hidden
-                >
-                <img v-if="facePreviewUrl" :src="facePreviewUrl" class="preview-img" />
-                <div v-else class="placeholder">
-                  <div class="icon-circle pink-bg"><el-icon><Avatar /></el-icon></div>
-                  <p>点击上传大头照</p>
-                  <span>用于锁定五官</span>
-                </div>
-                <button v-if="facePreviewUrl" class="delete-btn" @click.stop="clearFaceImage">×</button>
+                <button v-if="previewUrl" class="delete-btn" @click.stop="clearImage">×</button>
               </div>
             </div>
           </div>
@@ -158,7 +134,7 @@
         <div v-else class="empty-state">
           <div class="empty-icon">🎨</div>
           <h3>创作预览区</h3>
-          <p>请在左侧上传两张素材并输入指令</p>
+          <p>请在左侧上传参考图并输入分镜指令</p>
         </div>
 
         <!-- 错误提示 -->
@@ -174,9 +150,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { 
-  Picture, MagicStick, Clock, SuccessFilled, Loading, Download, Refresh, Delete, 
-  User, Avatar, EditPen, FullScreen, Files, Warning 
+import {
+  Picture, MagicStick, Clock, SuccessFilled, Loading, Download, Refresh, Delete,
+  User, Avatar, EditPen, FullScreen, Files, Warning
 } from '@element-plus/icons-vue'
 
 // --- 数据定义 ---
@@ -200,17 +176,14 @@ const resultUrl = ref('')
 const error = ref('')
 let pollTimer: any = null
 
-// 文件相关
-const bodyFile = ref<File | null>(null)
-const faceFile = ref<File | null>(null)
-const bodyPreviewUrl = ref('')
-const facePreviewUrl = ref('')
-const bodyFileInput = ref<HTMLInputElement | null>(null)
-const faceFileInput = ref<HTMLInputElement | null>(null)
+// 文件相关（改为单图）
+const file = ref<File | null>(null)
+const previewUrl = ref('')
+const fileInput = ref<HTMLInputElement | null>(null)
 
 // 计算属性：是否准备好生成
 const isReady = computed(() => {
-  return bodyFile.value && faceFile.value && form.prompt
+  return file.value && form.prompt
 })
 
 // --- 逻辑部分 (复用核心逻辑，适配新UI) ---
@@ -247,68 +220,48 @@ watch([form, status, resultUrl], () => saveState(), { deep: true })
 onMounted(() => loadState())
 onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 
-// 上传处理逻辑
-const triggerBodyUpload = () => bodyFileInput.value?.click()
-const triggerFaceUpload = () => faceFileInput.value?.click()
+// 上传处理逻辑（改为单图）
+const triggerUpload = () => fileInput.value?.click()
 
-const handleFileChange = (file: File, type: 'body' | 'face') => {
-  if (!file.type.startsWith('image/')) return ElMessage.error('请选择图片')
-  if (file.size > 10 * 1024 * 1024) return ElMessage.error('图片不能超过10MB')
-  
-  const url = URL.createObjectURL(file)
-  if (type === 'body') {
-    bodyFile.value = file
-    bodyPreviewUrl.value = url
-  } else {
-    faceFile.value = file
-    facePreviewUrl.value = url
-  }
+const handleFileChange = (e: Event) => {
+  const uploadedFile = (e.target as HTMLInputElement).files?.[0]
+  if (!uploadedFile) return
+
+  if (!uploadedFile.type.startsWith('image/')) return ElMessage.error('请选择图片')
+  if (uploadedFile.size > 10 * 1024 * 1024) return ElMessage.error('图片不能超过10MB')
+
+  const url = URL.createObjectURL(uploadedFile)
+  file.value = uploadedFile
+  previewUrl.value = url
 }
 
-const handleBodyFileChange = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) handleFileChange(file, 'body')
-}
-
-const handleFaceFileChange = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) handleFileChange(file, 'face')
-}
-
-const clearBodyImage = () => {
-  bodyFile.value = null
-  bodyPreviewUrl.value = ''
-  if (bodyFileInput.value) bodyFileInput.value.value = ''
-}
-
-const clearFaceImage = () => {
-  faceFile.value = null
-  facePreviewUrl.value = ''
-  if (faceFileInput.value) faceFileInput.value.value = ''
+const clearImage = () => {
+  file.value = null
+  previewUrl.value = ''
+  if (fileInput.value) fileInput.value.value = ''
 }
 
 // 生成逻辑
 const handleGenerate = async () => {
   if (!isReady.value) return
-  
+
   loading.value = true
   error.value = ''
   resultUrl.value = ''
   status.value = 'PENDING'
-  
+
   try {
     const formData = new FormData()
     formData.append('prompt', form.prompt)
     formData.append('ratio', form.ratio)
-    formData.append('imageBody', bodyFile.value!)
-    formData.append('imageFace', faceFile.value!)
+    formData.append('imageBody', file.value!) // 只上传单图
 
     const response = await fetch('http://localhost:3000/api/generate/img2img', {
       method: 'POST',
       body: formData
     })
     const data = await response.json()
-    
+
     if (data.success) {
       taskId.value = data.taskId
       pollStatus(data.taskId)
@@ -351,8 +304,7 @@ const handleClearAll = () => {
   localStorage.removeItem('img2img_state')
   form.prompt = ''
   resultUrl.value = ''
-  clearBodyImage()
-  clearFaceImage()
+  clearImage()
   error.value = ''
   taskId.value = null
   status.value = ''
@@ -561,7 +513,7 @@ $green: #6BCB77;
         display: flex;
         align-items: center;
         justify-content: center;
-        
+
         &:hover { transform: scale(1.1); }
       }
     }

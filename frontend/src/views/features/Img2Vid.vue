@@ -363,14 +363,23 @@ const handleClearAll = () => {
   localStorage.removeItem('img2vid_state')
 }
 
-const downloadVideo = () => {
+const downloadVideo = async () => {
   if (!generatedVideo.value) return
-  const link = document.createElement('a')
-  link.href = generatedVideo.value
-  link.download = `motion-${Date.now()}.mp4`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  try {
+    const response = await fetch(generatedVideo.value)
+    if (!response.ok) throw new Error('下载失败')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `motion-${Date.now()}.mp4`
+    document.body.appendChild(link)
+    link.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('下载失败:', error)
+  }
 }
 
 // 视频加载错误处理

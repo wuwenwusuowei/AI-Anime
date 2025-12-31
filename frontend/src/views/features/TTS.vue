@@ -293,13 +293,23 @@ const onAudioLoaded = () => {
   }
 }
 
-const downloadAudio = () => {
-  const link = document.createElement('a')
-  link.href = audioUrl.value
-  link.download = `pop-tts-${Date.now()}.${ttsForm.outputFormat}`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+const downloadAudio = async () => {
+  if (!audioUrl.value) return
+  try {
+    const response = await fetch(audioUrl.value)
+    if (!response.ok) throw new Error('下载失败')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `pop-tts-${Date.now()}.${ttsForm.outputFormat}`
+    document.body.appendChild(link)
+    link.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('下载失败:', error)
+  }
 }
 
 const handleClearAll = () => {

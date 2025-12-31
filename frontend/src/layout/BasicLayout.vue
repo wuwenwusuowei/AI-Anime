@@ -48,11 +48,11 @@
               
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item command="settings">
+                    <span class="pop-menu-item">⚙️ 设置</span>
+                  </el-dropdown-item>
                   <el-dropdown-item command="logout">
                     <span class="pop-menu-item">🚪 退出登录</span>
-                  </el-dropdown-item>
-                  <el-dropdown-item command="clear-login">
-                    <span class="pop-menu-item">🧹 清除缓存</span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -102,8 +102,7 @@ const menuItems = [
   { path: '/img2img', title: '图生图', icon: Picture },
   { path: '/img2vid', title: '漫改视频', icon: VideoPlay },
   { path: '/tts', title: '配音', icon: Microphone },
-  { path: '/history', title: '历史', icon: Clock },
-  { path: '/settings', title: '设置', icon: Tools }
+  { path: '/history', title: '历史', icon: Clock }
 ]
 
 const handleUserCommand = async (command: string) => {
@@ -114,15 +113,13 @@ const handleUserCommand = async (command: string) => {
         cancelButtonText: '再玩会',
         type: 'warning',
         // 自定义 Class 以匹配风格 (需要在全局样式定义，这里仅作示意)
-        customClass: 'pop-message-box' 
+        customClass: 'pop-message-box'
       })
       userStore.logout()
       router.push('/login')
     } catch {}
-  } else if (command === 'clear-login') {
-    userStore.logout()
-    localStorage.clear()
-    router.push('/login')
+  } else if (command === 'settings') {
+    router.push('/settings')
   }
 }
 </script>

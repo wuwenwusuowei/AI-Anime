@@ -277,48 +277,47 @@ async function optimizePrompt(userPrompt, styleSuffix = "") {
 }
 
 /**
- * 图生图分镜助手 (优化版 - 强化镜头语言)
- * 基于参考图和用户指令生成新的分镜描述提示词
+ * 图生图分镜助手 (自然语言优化版)
+ * 依靠 LLM 的理解力来构建 Prompt，避免硬编码导致的生硬感
  */
 async function generateScenePrompt(userInstruction, refImageDesc) {
     console.log(`🎬 [AI分镜] 正在生成分镜描述...`);
 
-    // 提取核心特征（发色、发型、服饰），不包含姿势
+    // 提取核心特征
     const coreFeatures = refImageDesc.split(',').slice(0, 5).join(',');
 
-    const systemPrompt = `你是一个专业的动漫分镜导演。
-    你的任务是基于一张[参考图]的人物设定，根据用户的[新指令]，构思一个新的画面分镜提示词。
+    const systemPrompt = `你是一个精通 Flux 模型的提示词专家。
+    你的任务是将用户的[简短指令]转化为一段**连贯、画面感极强**的英文分镜描述。
 
     输入信息：
-    1. 参考图描述：${refImageDesc}
-    2. 用户新指令：${userInstruction}
+    1. 参考图特征：${refImageDesc} (人物外观)
+    2. 用户指令：${userInstruction} (核心意图)
 
-    ⚠️ 核心规则 (CRITICAL):
-    1. **强制改变构图**：如果用户指令包含"俯视"、"仰视"、"全身"等词，必须在 Prompt 开头加入强烈的镜头语言 (e.g., "High angle shot from above", "Bird's eye view", "Dynamic foreshortening", "Low angle shot", "Dutch angle")。
-    2. **打破原有姿势**：不要死板地描述参考图的动作（如捧着花），除非用户要求保留。根据新指令重新设计动作。
-    3. **保留特征**：只保留人物核心特征（${coreFeatures}... 发色、服饰风格），不要保留姿势。
-    4. **权重强化**：对关键镜头词使用权重，例如 "(High angle shot:1.5), (Bird's eye view:1.4)"。
+    ⚠️ 编写原则 (Logic):
+    1. **结构化描述**：按照 [环境与背景] -> [镜头视角] -> [人物动作] -> [外观特征] 的顺序编写。**Flux 模型最关注开头的内容**。
+    2. **环境重构**：如果用户指令隐含了环境变化（如"飞在天上"暗示背景是天空），请在**第一句**明确描述新环境，并使用 "Vast", "Detailed", "Immersive" 等形容词来确立场景。
+    3. **镜头语言**：将用户的视角指令转化为专业的摄影术语 (e.g., High angle shot, Fisheye lens, Cinematic lighting)。
+    4. **自然融合**：不要堆砌标签，要写成通顺的句子。例如："She is soaring through a clear blue sky..." 而不是 "(Blue sky:1.5), flying"。
 
-    输出格式：直接输出一段英文 Prompt，包含：[镜头视角:1.2-1.5] + [环境光影] + [人物动作与表情] + [人物外观特征] + [风格]，使用括号()强化关键元素。`;
+    输出格式：一段完整的英文描述。`;
 
     try {
         const completion = await zhipu.chat.completions.create({
             model: "glm-4-flash",
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: "生成新分镜 Prompt" }
+                { role: "user", content: "生成优化后的 Prompt" }
             ]
         });
-        return completion.choices[0].message.content;
+
+        let prompt = completion.choices[0].message.content;
+        console.log(`✨ [LLM生成] ${prompt.substring(0, 60)}...`);
+        return prompt;
+
     } catch (e) {
         console.error("❌ 分镜生成失败:", e);
-        // 保底 Prompt 也加上高视角词和权重
-        const enhancedInstruction = userInstruction.includes('俯视') || userInstruction.includes('天上')
-            ? `(High angle shot:1.5), (Bird's eye view:1.4), looking down from above`
-            : userInstruction.includes('仰视') || userInstruction.includes('地下')
-            ? `(Low angle shot:1.5), (Worm's eye view:1.4), looking up from below`
-            : 'cinematic lighting, dynamic angle';
-        return `${enhancedInstruction}, ${userInstruction}, character features from: ${coreFeatures}`;
+        // 简单的保底
+        return `${userInstruction}, highly detailed, cinematic shot, ${coreFeatures}`;
     }
 }
 
@@ -363,21 +362,47 @@ async function downloadFileToLocal(cloudUrl, filename, type = "output") {
 // --- 4. ComfyUI 工具函数 ---
 
 async function uploadImageToComfy(localFilePath, originalFilename) {
-    console.log(`📤 [上传] 正在上传: ${originalFilename}`);
-    const formData = new FormData();
-    formData.append('image', fs.createReadStream(localFilePath));
-    formData.append('overwrite', 'true');
+    console.log(`📤 [上传] 正在处理图片: ${originalFilename}`);
+
+    // 1. 定义压缩后的临时文件路径
+    const compressedPath = localFilePath + "_compressed.jpg";
 
     try {
+        // 2. 使用 sharp 压缩图片
+        // resize: 限制宽或高不超过 1536px，保持比例
+        // jpeg: 质量 85，通常能把 10MB 的图压到 300KB 左右，且画质足够做参考图
+        await sharp(localFilePath)
+            .resize({ width: 1536, height: 1536, fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 85 })
+            .toFile(compressedPath);
+
+        console.log(`📉 图片已压缩，准备上传...`);
+
+        // 3. 上传压缩后的图片
+        const formData = new FormData();
+        formData.append('image', fs.createReadStream(compressedPath));
+        formData.append('overwrite', 'true');
+
         const response = await fetch(`${process.env.COMFY_API_URL}/upload/image`, {
             method: 'POST',
             body: formData
         });
-        if (!response.ok) throw new Error(`Upload Failed: ${response.statusText}`);
+
+        if (!response.ok) {
+            throw new Error(`ComfyUI Upload Failed: ${response.statusText}`);
+        }
+
         const data = await response.json();
-        return data.name; 
+
+        // 4. 上传成功后，删除压缩的临时文件
+        fs.unlinkSync(compressedPath);
+
+        return data.name;
+
     } catch (error) {
-        throw new Error(`连接失败: ${error.message}`);
+        // 出错也要尝试清理临时文件
+        if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
+        throw error;
     }
 }
 

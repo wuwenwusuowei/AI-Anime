@@ -195,22 +195,34 @@ const loadState = () => {
       const state = JSON.parse(saved)
       form.prompt = state.prompt || ''
       form.ratio = state.ratio || '9:16'
-      // 恢复预览图 URL (注意：File 对象无法恢复，需用户重新上传或仅展示预览)
-      // 这里简化处理：如果刷新页面，要求用户重新上传文件以保证逻辑严谨
-      // 仅恢复生成结果
-      if (state.status === 'COMPLETED') {
+
+      // 恢复之前的结果（只要 resultUrl 不为空）
+      if (state.resultUrl) {
         resultUrl.value = state.resultUrl
+        status.value = state.status || 'COMPLETED'
+      }
+
+      // 恢复进行中的任务
+      if (state.taskId && (state.status === 'PROCESSING' || state.status === 'PENDING')) {
+        taskId.value = state.taskId
+        status.value = state.status
+        loading.value = true
+        pollStatus(state.taskId)
       }
     }
   } catch (e) { console.error(e) }
 }
 
 const saveState = () => {
+  // 获取之前保存的状态
+  const previousState = JSON.parse(localStorage.getItem('img2img_state') || '{}')
+
   const state = {
     prompt: form.prompt,
     ratio: form.ratio,
     status: status.value,
-    resultUrl: resultUrl.value
+    // 如果当前有结果就用当前的，否则保留之前的结果
+    resultUrl: resultUrl.value || previousState.resultUrl || ''
   }
   localStorage.setItem('img2img_state', JSON.stringify(state))
 }
@@ -314,12 +326,21 @@ const handleClearAll = () => {
 
 const downloadImage = async () => {
   if (!resultUrl.value) return
-  const link = document.createElement('a')
-  link.href = resultUrl.value
-  link.download = `flux-remix-${Date.now()}.png`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  try {
+    const response = await fetch(resultUrl.value)
+    if (!response.ok) throw new Error('下载失败')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `flux-remix-${Date.now()}.png`
+    document.body.appendChild(link)
+    link.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('下载失败:', error)
+  }
 }
 </script>
 

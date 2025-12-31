@@ -120,7 +120,7 @@
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
           :total="total"
-          :page-sizes="[12, 24, 48]"
+          :page-sizes="[9, 18, 27]"
           layout="prev, pager, next"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -203,7 +203,7 @@ const userStore = useUserStore()
 const loading = ref(false)
 const activeTab = ref('all')
 const currentPage = ref(1)
-const pageSize = ref(12)
+const pageSize = ref(9)
 const total = ref(0)
 const historyItems = ref<any[]>([])
 
@@ -544,7 +544,7 @@ $purple: #9B5DE5;
 /* Grid Layout */
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   margin-bottom: 40px;
 }
@@ -836,9 +836,15 @@ $purple: #9B5DE5;
     padding: 4px;
     .pop-tab-item { padding: 8px 12px; font-size: 12px; }
   }
-  
+
   .history-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+  .history-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

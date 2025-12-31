@@ -126,3 +126,129 @@ html, body {
   transform: translateX(20px);
   opacity: 0;
 }
+
+// ElMessage 提示信息样式增强
+.el-message {
+  min-width: 320px;
+  padding: 18px 24px;
+  font-size: 18px;
+  font-weight: 900;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  border: 4px solid #000000;
+  transform: translateY(0);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  &.el-message--success {
+    background-color: #6BCB77;
+    color: #000000;
+  }
+
+  &.el-message--error {
+    background-color: #FF6B6B;
+    color: #000000;
+  }
+
+  &.el-message--warning {
+    background-color: #FFD93D;
+    color: #000000;
+  }
+
+  &.el-message--info {
+    background-color: #4D96FF;
+    color: #000000;
+  }
+
+  // 图标增强
+  .el-message__icon {
+    font-size: 24px;
+    margin-right: 14px;
+    font-weight: bold;
+  }
+
+  // 内容区 - 关键改进：更明显的文字样式
+  .el-message__content {
+    font-weight: 900;
+    font-size: 18px;
+    color: #000000 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    letter-spacing: 0.5px;
+  }
+
+  // 关闭按钮
+  .el-message__closeBtn {
+    color: #000000;
+    font-size: 20px;
+    font-weight: 900;
+    opacity: 0.9;
+
+    &:hover {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
+}
+
+// ElMessage 进入动画增强
+.el-message-enter-from {
+  transform: translateY(-30px) scale(0.9);
+  opacity: 0;
+}
+
+.el-message-leave-to {
+  transform: translateY(-30px) scale(0.9);
+  opacity: 0;
+}
+
+// 增强 ElMessage 图标颜色
+.el-message .el-message__icon {
+  &.el-message__icon--success {
+    color: #000000;
+  }
+  &.el-message__icon--error {
+    color: #000000;
+  }
+  &.el-message__icon--warning {
+    color: #000000;
+  }
+  &.el-message__icon--info {
+    color: #000000;
+  }
+}
+
+// Element Plus Loading 样式覆盖 (Pop Art 风格)
+.el-loading-mask {
+  background-color: rgba(251, 248, 243, 0.9) !important; // 淡米色背景
+}
+
+.el-loading-spinner {
+  &.circular {
+    border-color: #4D96FF !important; // 蓝色
+    border-left-color: transparent !important;
+  }
+  &.path {
+    stroke: #4D96FF !important; // 蓝色
+  }
+}
+
+.el-loading-text {
+  color: #1A1A1A !important;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Quicksand', sans-serif !important;
+  margin-top: 15px;
+}
+
+// Loading Dot 动画风格
+.el-loading-spinner .circular {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

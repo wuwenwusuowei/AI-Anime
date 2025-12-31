@@ -193,27 +193,36 @@ const loadState = () => {
       form.prompt = state.prompt || ''
       form.ratio = state.ratio || '9:16'
       form.style = state.style || 'default'
-      // 只有在非失败/非空闲状态下才恢复任务ID
-      if (state.status === 'PROCESSING' || state.status === 'PENDING') {
+
+      // 恢复之前的结果（只要 resultUrl 不为空）
+      if (state.resultUrl) {
+        resultUrl.value = state.resultUrl
+        status.value = state.status || 'COMPLETED'
+      }
+
+      // 恢复进行中的任务
+      if (state.taskId && (state.status === 'PROCESSING' || state.status === 'PENDING')) {
         taskId.value = state.taskId
         status.value = state.status
         loading.value = true
         pollStatus(state.taskId)
-      } else if (state.status === 'COMPLETED') {
-        resultUrl.value = state.resultUrl
       }
     }
   } catch (e) { console.error(e) }
 }
 
 const saveState = () => {
+  // 获取之前保存的状态
+  const previousState = JSON.parse(localStorage.getItem('txt2img_state') || '{}')
+
   const state = {
     prompt: form.prompt,
     ratio: form.ratio,
     style: form.style,
     taskId: taskId.value,
     status: status.value,
-    resultUrl: resultUrl.value
+    // 如果当前有结果就用当前的，否则保留之前的结果
+    resultUrl: resultUrl.value || previousState.resultUrl || ''
   }
   localStorage.setItem('txt2img_state', JSON.stringify(state))
 }
@@ -290,12 +299,21 @@ const handleClearAll = () => {
 
 const downloadImage = async () => {
   if (!resultUrl.value) return
-  const link = document.createElement('a')
-  link.href = resultUrl.value
-  link.download = `anime-gen-${Date.now()}.png`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  try {
+    const response = await fetch(resultUrl.value)
+    if (!response.ok) throw new Error('下载失败')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `anime-gen-${Date.now()}.png`
+    document.body.appendChild(link)
+    link.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('下载失败:', error)
+  }
 }
 </script>
 

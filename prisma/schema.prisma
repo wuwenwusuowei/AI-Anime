@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -30,7 +30,7 @@ model Video {
   prompt      String
   videoUrl    String?
   thumbnailUrl String?
-  status      VideoStatus @default(PENDING)
+  status      String   @default("PENDING")
   duration    Int?
   resolution  String?
   fileSize    Int?
@@ -54,16 +54,16 @@ model VideoTask {
   status           String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
 
   // 提示词相关 (向后兼容)
-  userPrompt       String?  @db.Text
+  userPrompt       String?
   style            String?
-  translatedPrompt String?  @db.Text
+  translatedPrompt String?
 
   // 关联 ComfyUI 的 ID
   promptId         String?  @unique
 
   // 结果
-  resultUrl        String?  @db.VarChar(512)
-  videoUrl         String?  @db.VarChar(512) // 向后兼容旧字段
+  resultUrl        String?
+  videoUrl         String? // 向后兼容旧字段
 
   // 新增: 存储参考图路径 (图生图专用)
   refImageBody     String?
@@ -92,12 +92,5 @@ model Template {
   updatedAt   DateTime @updatedAt
   
   @@map("templates")
-}
-
-enum VideoStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
 }
 

@@ -71,6 +71,14 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'merge',
+        name: 'Merge',
+        component: () => import('../views/features/Merge.vue'),
+        meta: {
+          title: '漫改视频'
+        }
+      },
+      {
         path: 'history',
         name: 'History',
         component: () => import('../views/history/History.vue'),

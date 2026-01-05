@@ -86,7 +86,8 @@ import {
   Microphone,
   Clock,
   Tools,
-  MagicStick
+  MagicStick,
+  Connection
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -98,10 +99,11 @@ const userInfo = computed(() => userStore.userInfo)
 // 菜单配置
 const menuItems = [
   { path: '/dashboard', title: '首页', icon: House },
-  { path: '/txt2img', title: '文生图', icon: MagicStick }, // 换了个更魔幻的图标
+  { path: '/txt2img', title: '文生图', icon: MagicStick },
   { path: '/img2img', title: '图生图', icon: Picture },
-  { path: '/img2vid', title: '漫改视频', icon: VideoPlay },
+  { path: '/img2vid', title: '图生视频', icon: VideoPlay },
   { path: '/tts', title: '配音', icon: Microphone },
+  { path: '/merge', title: '漫改视频', icon: Connection },
   { path: '/history', title: '历史', icon: Clock }
 ]
 

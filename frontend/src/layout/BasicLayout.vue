@@ -84,7 +84,6 @@ import {
   Picture,
   VideoPlay,
   Microphone,
-  Clock,
   Tools,
   MagicStick,
   Connection
@@ -103,8 +102,7 @@ const menuItems = [
   { path: '/img2img', title: '图生图', icon: Picture },
   { path: '/img2vid', title: '图生视频', icon: VideoPlay },
   { path: '/tts', title: '配音', icon: Microphone },
-  { path: '/merge', title: '漫改视频', icon: Connection },
-  { path: '/history', title: '历史', icon: Clock }
+  { path: '/merge', title: '漫改视频', icon: Connection }
 ]
 
 const handleUserCommand = async (command: string) => {

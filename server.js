@@ -12,6 +12,8 @@ import { pipeline } from 'stream';
 import { promisify } from 'util';
 import sharp from 'sharp'; // 🟢 [新增] 引入强大的图片处理库
 import 'dotenv/config';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from '@ffmpeg-installer/ffmpeg';
 import authRoutes from './routes/auth.js';
 import videoRoutes from './routes/videos.js';
 import taskRoutes from './routes/tasks.js';
@@ -19,9 +21,67 @@ import templateRoutes from './routes/templates.js';
 
 const streamPipeline = promisify(pipeline);
 
+// 设置 FFmpeg 路径
+ffmpeg.setFfmpegPath(ffmpegPath.path);
+console.log('✅ FFmpeg 路径已设置:', ffmpegPath.path);
+
 // --- 1. 配置常量 ---
 
-// 画质配置 (16:9)
+// ========================================
+// DaSiWa 8.1 比例配置（基于 LayerUtility 节点 141/146）
+// ========================================
+const RATIO_SETTING = {
+    "16:9": {
+        ratio: "16:9",
+        longest: 1024,    // 默认长边值 (12GB显存推荐)
+        width: 1024,
+        height: 576,
+        vram_min: 12,
+        description: "标准横屏 (电脑网页、B站视频)"
+    },
+    "16:9-hd": {
+        ratio: "16:9",
+        longest: 1280,    // 高清长边值 (需16GB以上显存)
+        width: 1280,
+        height: 720,
+        vram_min: 16,
+        description: "高清横屏 (电影质感、大屏展示)"
+    },
+    "9:16": {
+        ratio: "9:16",
+        longest: 1024,    // 默认长边值 (12GB显存推荐)
+        width: 576,
+        height: 1024,
+        vram_min: 12,
+        description: "手机竖屏 (抖音、小红书、快手)"
+    },
+    "9:16-hd": {
+        ratio: "9:16",
+        longest: 1280,    // 高清长边值 (需16GB以上显存)
+        width: 720,
+        height: 1280,
+        vram_min: 16,
+        description: "高清竖屏 (高质量竖屏短剧)"
+    },
+    "1:1": {
+        ratio: "1:1",
+        longest: 832,     // 正方形长边值
+        width: 832,
+        height: 832,
+        vram_min: 8,
+        description: "正方形 (头像、朋友圈、Instagram)"
+    },
+    "4:3": {
+        ratio: "4:3",
+        longest: 1024,    // 复古比例长边值
+        width: 1024,
+        height: 768,
+        vram_min: 12,
+        description: "复古比例 (复古动漫、经典番剧感)"
+    }
+};
+
+// 画质配置 (16:9) - 保留用于旧版工作流
 const RESOLUTION_CONFIG = {
     "576p": { width: 1024, height: 576 },
     "720p": { width: 1280, height: 720 }
@@ -42,6 +102,29 @@ const ASPECT_RATIOS = {
     "9:16": { width: 832, height: 1216 }, // 竖屏 (最佳分镜比例)
     "16:9": { width: 1216, height: 832 }, // 横屏
     "3:4": { width: 896, height: 1152 }
+};
+
+// ========================================
+// DaSiWa 8.1 双路径系统节点 ID 定义
+// ========================================
+const DASIWAN_NODES = {
+    // 首尾帧模式（双图）节点 ID
+    DUAL_START_IMAGE: "211",       // 起始图加载
+    DUAL_END_IMAGE: "209",         // 结束图加载
+    DUAL_POSITIVE_PROMPT: "136",   // 正面提示词
+    DUAL_NEGATIVE_PROMPT: "128",   // 负面提示词
+    DUAL_RESOLUTION_VALUE: "300",  // 画质缩放值（长边：1024=576p, 1280=720p）
+    DUAL_DURATION_VALUE: "301",    // 视频时长（81=5秒, 49=3秒）
+    DUAL_VIDEO_GEN: "139",         // 视频生成节点（WanFirstLastFrameToVideo）
+    DUAL_FINAL_OUTPUT: "125",      // 最终视频输出节点（VHS_VideoCombine）
+    
+    // 纯单图模式（PainterI2V）节点 ID
+    SINGLE_START_IMAGE: "297",       // 起始图加载
+    SINGLE_POSITIVE_PROMPT: "287",   // 正面提示词
+    SINGLE_RESOLUTION_VALUE: "298",  // 画质缩放值（长边：1024=576p, 1280=720p）
+    SINGLE_DURATION_VALUE: "299",    // 视频时长（81=5秒, 49=3秒）
+    SINGLE_VIDEO_GEN: "293",         // 视频生成节点（PainterI2V - 无首尾锁定）
+    SINGLE_FINAL_OUTPUT: "269"      // 最终视频输出节点（VHS_VideoCombine）
 };
 
 // --- 风格配置表 (基于用户指定文件) ---
@@ -160,6 +243,20 @@ const zhipu = new OpenAI({
     apiKey: process.env.ZHIPU_API_KEY, 
     baseURL: "https://open.bigmodel.cn/api/paas/v4/" 
 });
+
+// 豆包API配置
+const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
+const DOUBAO_API_KEY = process.env.DOUBAO_API_KEY;
+const DOUBAO_MODEL = 'doubao-seedream-4-5-251128';
+
+// 豆包画幅映射（API接受的size参数）
+// 豆包API要求图片至少3,686,400像素，所以使用更大的尺寸
+const DOUBAO_SIZE_MAP = {
+    "9:16": "1920x2560",  // 4,915,200 像素
+    "1:1": "2048x2048",   // 4,194,304 像素
+    "16:9": "2560x1440",  // 3,686,400 像素（正好满足最低要求）
+    "3:4": "1920x2560"    // 4,915,200 像素（复用9:16的尺寸）
+};
 
 // --- 3. 核心 AI 逻辑 (完美修复版) ---
 
@@ -359,7 +456,84 @@ async function downloadFileToLocal(cloudUrl, filename, type = "output") {
     }
 }
 
-// --- 4. ComfyUI 工具函数 ---
+// --- 4. 豆包API工具函数 ---
+
+/**
+ * 上传图片到云端，返回可访问的URL
+ * 用于豆包API需要图片URL的情况
+ */
+async function uploadImageToCloud(localFilePath) {
+    console.log(`📤 [上传] 正在上传图片到云端...`);
+
+    try {
+        // 读取图片并转换为base64
+        const imageBuffer = fs.readFileSync(localFilePath);
+        const base64Image = imageBuffer.toString('base64');
+
+        // 使用data URL格式
+        const dataUrl = `data:image/png;base64,${base64Image}`;
+
+        // 简单返回data URL（豆包API支持data URL）
+        return dataUrl;
+    } catch (error) {
+        console.error('❌ 图片上传失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 调用豆包API进行图生图
+ * @param {string} prompt - 提示词
+ * @param {string|string[]} imageUrl - 参考图URL（可以是单张图片URL或图片URL数组）
+ * @param {string} ratio - 画幅比例 (9:16, 1:1, 16:9, 3:4)
+ */
+async function callDoubaoImg2Img(prompt, imageUrl, ratio = "1:1") {
+    console.log(`🎨 [豆包图生图] 开始生成...`);
+
+    const size = DOUBAO_SIZE_MAP[ratio] || DOUBAO_SIZE_MAP["1:1"];
+
+    const requestData = {
+        model: DOUBAO_MODEL,
+        prompt: prompt,
+        image: Array.isArray(imageUrl) ? imageUrl : imageUrl,
+        sequential_image_generation: "disabled",
+        response_format: "url",
+        size: size,
+        stream: false,
+        watermark: true
+    };
+
+    console.log(`🔧 [配置] 提示词: ${prompt.substring(0, 50)}... | 画幅: ${ratio} (${size})`);
+    console.log(`🔧 [配置] 参考图数量: ${Array.isArray(imageUrl) ? imageUrl.length : 1}`);
+
+    try {
+        const response = await fetch(DOUBAO_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${DOUBAO_API_KEY}`
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ 豆包API错误:', response.status, errorText);
+            throw new Error(`豆包API调用失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`✅ [豆包] 生成成功`);
+        console.log(`📦 [豆包] 返回数据:`, JSON.stringify(data, null, 2));
+
+        return data;
+    } catch (error) {
+        console.error('❌ 豆包API调用失败:', error);
+        throw error;
+    }
+}
+
+// --- 5. ComfyUI 工具函数 ---
 
 async function uploadImageToComfy(localFilePath, originalFilename) {
     console.log(`📤 [上传] 正在处理图片: ${originalFilename}`);
@@ -506,55 +680,159 @@ async function triggerImg2Img(scenePrompt, ratio = "9:16", refImageName) {
     return data.prompt_id;
 }
 
-async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "576p", durationKey = "3") {
-    const workflowPath = path.join(__dirname, 'Image-to-Video.json');
-    let workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "576p", durationKey = "3", promptSegments = null, ratio = "16:9") {
+    let workflowPath;
+    let workflow;
 
-    // --- ID 配置 (请根据实际 workflow 调整) ---
-    const TEXT_NODE = "30";
-    const IMAGE_NODE = "43";
-    const PAINTER_NODE = "56";
-    const RESIZE_NODE = "59";
-    const SAMPLER_IDS = ["38", "39"];
-    // ------------------------------------
+    // 根据时长选择不同的工作流文件
+    if (durationKey === '20') {
+        workflowPath = path.join(__dirname, '【Work-Fisher】【12.30】SVI 2.0超强长视频生成（完美一致性）-20秒版.json');
+        workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 
-    const resConfig = RESOLUTION_CONFIG[resolutionKey] || RESOLUTION_CONFIG["576p"];
-    const targetFrames = DURATION_MAP[durationKey] || 49;
+        // 20秒版本的关键节点ID映射（镜头1-5）
+        const IMAGE_NODE = "16"; // 图片上传节点
+        const TEXT_NODE_MAPPING = ["42", "43", "44", "40", "41"]; // 5个提示词分段节点
+        const WIDTH_NODE = "23"; // 宽度节点
+        const HEIGHT_NODE = "24"; // 高度节点
 
-    console.log(`🔧 [配置] 画质: ${resConfig.width}x${resConfig.height} | 时长: ${durationKey}s (${targetFrames}帧)`);
-
-    // 修改参数
-    if (workflow[PAINTER_NODE]) {
-        workflow[PAINTER_NODE].inputs.width = resConfig.width;
-        workflow[PAINTER_NODE].inputs.height = resConfig.height;
-        workflow[PAINTER_NODE].inputs.length = targetFrames;
-        console.log(`✅ [Painter节点] 设置: ${resConfig.width}x${resConfig.height}, ${targetFrames}帧`);
-    }
-    if (workflow[RESIZE_NODE]) {
-        workflow[RESIZE_NODE].inputs.width = resConfig.width;
-        workflow[RESIZE_NODE].inputs.height = resConfig.height;
-        // 移除 device: "cpu"，使用默认设备
-        if (workflow[RESIZE_NODE].inputs.device) {
-            delete workflow[RESIZE_NODE].inputs.device;
+        // 设置分辨率
+        const ratioConfig = RATIO_SETTING[ratio] || RATIO_SETTING["16:9"];
+        if (workflow[WIDTH_NODE]) {
+            workflow[WIDTH_NODE].inputs.value = ratioConfig.width;
+            console.log(`✅ [20秒-宽度节点] 节点${WIDTH_NODE}: ${ratioConfig.width}px`);
         }
-        console.log(`✅ [Resize节点] 设置: ${resConfig.width}x${resConfig.height}`);
-    }
-    if (workflow[TEXT_NODE]) {
-        workflow[TEXT_NODE].inputs.text = positivePrompt;
-        console.log(`✅ [文本节点] Prompt长度: ${positivePrompt.length}字符`);
-    }
-    if (workflow[IMAGE_NODE]) {
-        workflow[IMAGE_NODE].inputs.image = cloudImageName;
-        console.log(`✅ [图像节点] 图片: ${cloudImageName}`);
+        if (workflow[HEIGHT_NODE]) {
+            workflow[HEIGHT_NODE].inputs.value = ratioConfig.height;
+            console.log(`✅ [20秒-高度节点] 节点${HEIGHT_NODE}: ${ratioConfig.height}px`);
+        }
+        console.log(`📐 [20秒-比例] ${ratio}: ${ratioConfig.description} (${ratioConfig.width}x${ratioConfig.height})`);
+
+        // 替换图片
+        if (workflow[IMAGE_NODE]) {
+            workflow[IMAGE_NODE].inputs.image = cloudImageName;
+            console.log(`✅ [20秒-图像节点] 图片: ${cloudImageName}`);
+        }
+
+        // 替换提示词（分段填充）
+        if (promptSegments && Array.isArray(promptSegments)) {
+            TEXT_NODE_MAPPING.forEach((nodeId, index) => {
+                // 如果用户提供的提示词段数少于需要的节点数，循环使用最后一段
+                const text = promptSegments[index] || promptSegments[promptSegments.length - 1];
+                if (workflow[nodeId]) {
+                    workflow[nodeId].inputs.prompt = text;
+                    console.log(`✅ [20秒-镜头${index + 1}] 节点${nodeId}: ${text.substring(0, 30)}...`);
+                }
+            });
+            console.log(`✅ [20秒-文本节点] 已分配 ${promptSegments.length} 段提示词到 ${TEXT_NODE_MAPPING.length} 个镜头节点`);
+        } else {
+            // 降级处理：单段提示词
+            TEXT_NODE_MAPPING.forEach(nodeId => {
+                if (workflow[nodeId]) {
+                    workflow[nodeId].inputs.prompt = positivePrompt;
+                }
+            });
+            console.log(`✅ [20秒-文本节点] 使用单段提示词，已分配到 ${TEXT_NODE_MAPPING.length} 个节点`);
+        }
+
+    } else if (durationKey === '10') {
+        workflowPath = path.join(__dirname, '【Work-Fisher】【12.30】SVI 2.0超强长视频生成（完美一致性）-10秒版.json');
+        workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+
+        // 10秒版本的关键节点ID映射（镜头1-3）
+        const IMAGE_NODE = "17"; // 图片上传节点
+        const TEXT_NODE_MAPPING = ["43", "44", "45"]; // 3个提示词分段节点
+        const WIDTH_NODE = "24"; // 宽度节点
+        const HEIGHT_NODE = "25"; // 高度节点
+
+        // 设置分辨率
+        const ratioConfig = RATIO_SETTING[ratio] || RATIO_SETTING["16:9"];
+        if (workflow[WIDTH_NODE]) {
+            workflow[WIDTH_NODE].inputs.value = ratioConfig.width;
+            console.log(`✅ [10秒-宽度节点] 节点${WIDTH_NODE}: ${ratioConfig.width}px`);
+        }
+        if (workflow[HEIGHT_NODE]) {
+            workflow[HEIGHT_NODE].inputs.value = ratioConfig.height;
+            console.log(`✅ [10秒-高度节点] 节点${HEIGHT_NODE}: ${ratioConfig.height}px`);
+        }
+        console.log(`📐 [10秒-比例] ${ratio}: ${ratioConfig.description} (${ratioConfig.width}x${ratioConfig.height})`);
+
+        // 替换图片
+        if (workflow[IMAGE_NODE]) {
+            workflow[IMAGE_NODE].inputs.image = cloudImageName;
+            console.log(`✅ [10秒-图像节点] 图片: ${cloudImageName}`);
+        }
+
+        // 替换提示词（分段填充）
+        if (promptSegments && Array.isArray(promptSegments)) {
+            TEXT_NODE_MAPPING.forEach((nodeId, index) => {
+                const text = promptSegments[index] || promptSegments[promptSegments.length - 1];
+                if (workflow[nodeId]) {
+                    workflow[nodeId].inputs.prompt = text;
+                    console.log(`✅ [10秒-镜头${index + 1}] 节点${nodeId}: ${text.substring(0, 30)}...`);
+                }
+            });
+            console.log(`✅ [10秒-文本节点] 已分配 ${promptSegments.length} 段提示词到 ${TEXT_NODE_MAPPING.length} 个镜头节点`);
+        } else {
+            // 降级处理：单段提示词
+            TEXT_NODE_MAPPING.forEach(nodeId => {
+                if (workflow[nodeId]) {
+                    workflow[nodeId].inputs.prompt = positivePrompt;
+                }
+            });
+            console.log(`✅ [10秒-文本节点] 使用单段提示词，已分配到 ${TEXT_NODE_MAPPING.length} 个节点`);
+        }
+
+    } else {
+        // 原有的 5秒 逻辑
+        workflowPath = path.join(__dirname, 'Image-to-Video.json');
+        workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+
+        // --- ID 配置 (请根据实际 workflow 调整) ---
+        const TEXT_NODE = "30";
+        const IMAGE_NODE = "43";
+        const PAINTER_NODE = "56";
+        const RESIZE_NODE = "59";
+        const SAMPLER_IDS = ["38", "39"];
+        // ------------------------------------
+
+        const resConfig = RESOLUTION_CONFIG[resolutionKey] || RESOLUTION_CONFIG["576p"];
+        const targetFrames = DURATION_MAP[durationKey] || 49;
+
+        console.log(`🔧 [配置] 画质: ${resConfig.width}x${resConfig.height} | 时长: ${durationKey}s (${targetFrames}帧)`);
+
+        // 修改参数
+        if (workflow[PAINTER_NODE]) {
+            workflow[PAINTER_NODE].inputs.width = resConfig.width;
+            workflow[PAINTER_NODE].inputs.height = resConfig.height;
+            workflow[PAINTER_NODE].inputs.length = targetFrames;
+            console.log(`✅ [Painter节点] 设置: ${resConfig.width}x${resConfig.height}, ${targetFrames}帧`);
+        }
+        if (workflow[RESIZE_NODE]) {
+            workflow[RESIZE_NODE].inputs.width = resConfig.width;
+            workflow[RESIZE_NODE].inputs.height = resConfig.height;
+            // 移除 device: "cpu"，使用默认设备
+            if (workflow[RESIZE_NODE].inputs.device) {
+                delete workflow[RESIZE_NODE].inputs.device;
+            }
+            console.log(`✅ [Resize节点] 设置: ${resConfig.width}x${resConfig.height}`);
+        }
+        if (workflow[TEXT_NODE]) {
+            workflow[TEXT_NODE].inputs.text = positivePrompt;
+            console.log(`✅ [文本节点] Prompt长度: ${positivePrompt.length}字符`);
+        }
+        if (workflow[IMAGE_NODE]) {
+            workflow[IMAGE_NODE].inputs.image = cloudImageName;
+            console.log(`✅ [图像节点] 图片: ${cloudImageName}`);
+        }
+
+        // 随机种子
+        const randomSeed = Math.floor(Math.random() * 1000000000000);
+        SAMPLER_IDS.forEach(id => {
+            if (workflow[id]) workflow[id].inputs.noise_seed = randomSeed;
+        });
     }
 
-    // 随机种子
-    const randomSeed = Math.floor(Math.random() * 1000000000000);
-    SAMPLER_IDS.forEach(id => {
-        if (workflow[id]) workflow[id].inputs.noise_seed = randomSeed;
-    });
-
-    console.log(`🚀 [触发] 发送任务... 种子: ${randomSeed}`);
+    console.log(`🚀 [触发] 发送任务... 工作流: ${workflowPath}`);
 
     const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
         method: 'POST',
@@ -570,6 +848,150 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
     }
     const data = await response.json();
     return data.prompt_id;
+}
+
+// ========================================
+// DaSiWa 8.1 双路径系统触发函数
+// ========================================
+async function triggerComfyUINew(startImageName, endImageName, prompt, ratio = "16:9", durationKey = "3") {
+    // 使用完整的 DaSiWa 8.1 工作流文件（双路径系统）
+    const workflowPath = path.join(__dirname, 'DaSiWa_81_API.json');
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+
+    const isDualImageMode = startImageName !== endImageName;
+    const modeName = isDualImageMode ? '首尾帧（双图）' : '纯单图';
+    console.log(`🎬 [双路径系统] 模式: ${modeName}`);
+    console.log(`🎬 [工作流] DaSiWa 8.1 (完整版)`);
+
+    // ========================================
+    // 通用配置：比例和帧数
+    // ========================================
+    const ratioConfig = RATIO_SETTING[ratio] || RATIO_SETTING["16:9"];
+    const targetFrames = DURATION_MAP[durationKey] || 49;
+    console.log(`📐 [比例] ${ratio}: ${ratioConfig.description} (${ratioConfig.width}x${ratioConfig.height})`);
+    console.log(`⏱️ [时长] ${targetFrames}帧 (${durationKey}s)`);
+
+    if (isDualImageMode) {
+        // ========================================
+        // 路径A：首尾帧模式（双图）
+        // ========================================
+        console.log(`🚀 [路径A] 首尾帧模式 - 使用节点 139 (WanFirstLastFrameToVideo)`);
+
+        // 设置提示词（节点136）
+        if (workflow[DASIWAN_NODES.DUAL_POSITIVE_PROMPT]) {
+            workflow[DASIWAN_NODES.DUAL_POSITIVE_PROMPT].inputs.text = prompt;
+            console.log(`✅ [提示词] 节点${DASIWAN_NODES.DUAL_POSITIVE_PROMPT}: ${prompt.substring(0, 50)}...`);
+        }
+
+        // 设置画质缩放（节点300）
+        if (workflow[DASIWAN_NODES.DUAL_RESOLUTION_VALUE]) {
+            workflow[DASIWAN_NODES.DUAL_RESOLUTION_VALUE].inputs.value = ratioConfig.longest;
+            console.log(`✅ [画质缩放] 节点${DASIWAN_NODES.DUAL_RESOLUTION_VALUE}: ${ratioConfig.longest}px (长边)`);
+        }
+
+        // 设置视频时长（节点301）
+        if (workflow[DASIWAN_NODES.DUAL_DURATION_VALUE]) {
+            workflow[DASIWAN_NODES.DUAL_DURATION_VALUE].inputs.value = targetFrames;
+            console.log(`✅ [视频时长] 节点${DASIWAN_NODES.DUAL_DURATION_VALUE}: ${targetFrames}帧`);
+        }
+
+        // 设置起始图（节点211）
+        if (workflow[DASIWAN_NODES.DUAL_START_IMAGE]) {
+            workflow[DASIWAN_NODES.DUAL_START_IMAGE].inputs.image = startImageName;
+            console.log(`✅ [起始图] 节点${DASIWAN_NODES.DUAL_START_IMAGE}: ${startImageName}`);
+        }
+
+        // 设置结束图（节点209）
+        if (workflow[DASIWAN_NODES.DUAL_END_IMAGE]) {
+            workflow[DASIWAN_NODES.DUAL_END_IMAGE].inputs.image = endImageName;
+            console.log(`✅ [结束图] 节点${DASIWAN_NODES.DUAL_END_IMAGE}: ${endImageName}`);
+        }
+
+        // 视频生成节点（139）- 连接已自动完成
+        console.log(`✅ [视频生成] 节点${DASIWAN_NODES.DUAL_VIDEO_GEN}: 首尾帧计算，${targetFrames}帧`);
+
+        // 🔧 禁用单图路径的节点（mode: 4 = Never）
+        if (workflow[DASIWAN_NODES.SINGLE_VIDEO_GEN]) {
+            workflow[DASIWAN_NODES.SINGLE_VIDEO_GEN].mode = 4;
+            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.SINGLE_VIDEO_GEN} (PainterI2V)`);
+        }
+        if (workflow[DASIWAN_NODES.SINGLE_FINAL_OUTPUT]) {
+            workflow[DASIWAN_NODES.SINGLE_FINAL_OUTPUT].mode = 4;
+            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.SINGLE_FINAL_OUTPUT} (单图输出)`);
+        }
+
+    } else {
+        // ========================================
+        // 路径B：纯单图模式（PainterI2V - 无首尾锁定）
+        // ========================================
+        console.log(`🚀 [路径B] 纯单图模式 - 使用节点 293 (PainterI2V)`);
+        console.log(`🎯 [关键] PainterI2V 专为单图设计，无"首尾锁定"，AI可自由生成动作！`);
+
+        // 设置提示词（节点287）
+        if (workflow[DASIWAN_NODES.SINGLE_POSITIVE_PROMPT]) {
+            workflow[DASIWAN_NODES.SINGLE_POSITIVE_PROMPT].inputs.text = prompt;
+            console.log(`✅ [提示词] 节点${DASIWAN_NODES.SINGLE_POSITIVE_PROMPT}: ${prompt.substring(0, 50)}...`);
+        }
+
+        // 设置画质缩放（节点298）
+        if (workflow[DASIWAN_NODES.SINGLE_RESOLUTION_VALUE]) {
+            workflow[DASIWAN_NODES.SINGLE_RESOLUTION_VALUE].inputs.value = ratioConfig.longest;
+            console.log(`✅ [画质缩放] 节点${DASIWAN_NODES.SINGLE_RESOLUTION_VALUE}: ${ratioConfig.longest}px (长边)`);
+        }
+
+        // 设置视频时长（节点299）
+        if (workflow[DASIWAN_NODES.SINGLE_DURATION_VALUE]) {
+            workflow[DASIWAN_NODES.SINGLE_DURATION_VALUE].inputs.value = targetFrames;
+            console.log(`✅ [视频时长] 节点${DASIWAN_NODES.SINGLE_DURATION_VALUE}: ${targetFrames}帧`);
+        }
+
+        // 设置起始图（节点297）
+        if (workflow[DASIWAN_NODES.SINGLE_START_IMAGE]) {
+            workflow[DASIWAN_NODES.SINGLE_START_IMAGE].inputs.image = startImageName;
+            console.log(`✅ [起始图] 节点${DASIWAN_NODES.SINGLE_START_IMAGE}: ${startImageName}`);
+        }
+
+        // 视频生成节点（293）- 自动运行
+        console.log(`✅ [视频生成] 节点${DASIWAN_NODES.SINGLE_VIDEO_GEN}: PainterI2V 自由生成，${targetFrames}帧`);
+
+        // 🔧 禁用双图路径的节点（mode: 4 = Never）
+        if (workflow[DASIWAN_NODES.DUAL_VIDEO_GEN]) {
+            workflow[DASIWAN_NODES.DUAL_VIDEO_GEN].mode = 4;
+            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.DUAL_VIDEO_GEN} (WanFirstLastFrameToVideo)`);
+        }
+        if (workflow[DASIWAN_NODES.DUAL_FINAL_OUTPUT]) {
+            workflow[DASIWAN_NODES.DUAL_FINAL_OUTPUT].mode = 4;
+            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.DUAL_FINAL_OUTPUT} (双图输出)`);
+        }
+    }
+
+    // 随机种子（采样器节点115）
+    const randomSeed = Math.floor(Math.random() * 1000000000000);
+    if (workflow["115"]) {
+        workflow["115"].inputs.noise_seed = randomSeed;
+    }
+
+    console.log(`🚀 [触发] 发送任务... 模式: ${isDualImageMode ? 'DUAL' : 'SINGLE'}`);
+
+    const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: workflow })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [ComfyUI错误] 响应:', errorText);
+        throw new Error(`ComfyUI Error: ${response.statusText} - ${errorText}`);
+    }
+    const data = await response.json();
+    
+    // 返回模式和 prompt_id
+    return {
+        prompt_id: data.prompt_id,
+        mode: isDualImageMode ? 'DUAL' : 'SINGLE',
+        targetOutputNode: isDualImageMode ? DASIWAN_NODES.DUAL_FINAL_OUTPUT : DASIWAN_NODES.SINGLE_FINAL_OUTPUT
+    };
 }
 
 // --- 4. TTS API 路由 ---
@@ -1229,32 +1651,40 @@ app.post('/api/generate/txt2img', async (req, res) => {
     }
 });
 
-// Flux 图生图接口 (Kontext + 分镜助手)
-// 前端可能还是传 imageBody 和 imageFace，这里为了兼容只取 imageBody
+// Flux 图生图接口 (Kontext + 分镜助手 + 豆包支持)
+// 支持两种模式：ComfyUI (默认) 和 豆包 (即梦)
+// 豆包模式支持单图或多图模式
 app.post('/api/generate/img2img', upload.fields([
     { name: 'imageBody', maxCount: 1 },
+    { name: 'images', maxCount: 10 }, // 支持多图上传（豆包专用）
     { name: 'imageFace', maxCount: 1 }
 ]), async (req, res) => {
     try {
-        const { prompt, ratio } = req.body;
-        const refImage = req.files?.imageBody?.[0]; // 只需要一张主参考图
+        const { prompt, ratio, model = 'comfyui', multiImageMode = 'false' } = req.body; // 默认使用ComfyUI
+        const refImage = req.files?.imageBody?.[0]; // 单图参考图（ComfyUI用）
+        const multiImages = req.files?.images || []; // 多图数组（豆包多图模式用）
 
-        if (!refImage) {
-            return res.status(400).json({ error: "请至少上传一张参考图(imageBody)" });
+        console.log('📋 [调试] req.files:', Object.keys(req.files || {}));
+        console.log('📋 [调试] multiImages.length:', multiImages.length);
+        console.log('📋 [调试] multiImageMode:', multiImageMode, typeof multiImageMode);
+        console.log('📋 [调试] refImage:', refImage ? '存在' : '不存在');
+
+        if (!refImage && multiImages.length === 0) {
+            return res.status(400).json({ error: "请至少上传一张参考图" });
         }
 
         if (!prompt) {
             return res.status(400).json({ error: "请提供分镜描述或动作指令" });
         }
 
-        console.log(`\n🆕 [Kontext 图生图] 收到任务: ${prompt}`);
+        console.log(`\n🆕 [${model.toUpperCase()} 图生图] 收到任务: ${prompt} | 模型: ${model} | 多图模式: ${multiImageMode}`);
 
         const task = await prisma.videoTask.create({
             data: {
                 userPrompt: prompt,
                 type: 'IMG2IMG',
                 status: 'PENDING',
-                refImageBody: refImage.path // 记录参考图路径
+                refImageBody: refImage?.path // 记录参考图路径（多图模式可能为空）
             }
         });
 
@@ -1263,42 +1693,117 @@ app.post('/api/generate/img2img', upload.fields([
         // 异步执行任务
         (async () => {
             try {
-                // 1. 上传参考图
-                const cloudName = await uploadImageToComfy(refImage.path, refImage.originalname);
+                if (model === 'doubao') {
+                    // === 豆包模式 ===
+                    console.log('🥤 [豆包模式] 调用豆包API...');
 
-                // 2. 视觉分析 (提取参考图特征)
-                const refFeatures = await analyzeImageFeatures(refImage.path);
+                    let imageUrl;
 
-                // 3. 生成分镜提示词 (结合用户指令 + 参考图特征)
-                const scenePrompt = await generateScenePrompt(prompt, refFeatures);
+                    if (multiImageMode === 'true' && multiImages.length > 0) {
+                        // 多图模式：上传所有图片到云端
+                        console.log(`📸 [多图模式] 上传 ${multiImages.length} 张图片...`);
+                        const uploadPromises = multiImages.map(img => uploadImageToCloud(img.path));
+                        imageUrl = await Promise.all(uploadPromises);
+                        console.log(`✅ [多图模式] 所有图片已上传`);
+                    } else {
+                        // 单图模式：上传单张图片
+                        imageUrl = await uploadImageToCloud(refImage.path);
+                    }
 
-                await prisma.videoTask.update({
-                    where: { id: task.id },
-                    data: { translatedPrompt: scenePrompt }
-                });
+                    // 2. 调用豆包API
+                    const result = await callDoubaoImg2Img(prompt, imageUrl, ratio || '1:1');
 
-                // 4. 触发 Kontext 工作流
-                const promptId = await triggerImg2Img(scenePrompt, ratio || '9:16', cloudName);
+                    // 3. 豆包返回的是URL，需要下载到本地
+                    console.log(`📦 [解析] result结构:`, Object.keys(result));
+                    if (result.data) {
+                        console.log(`📦 [解析] result.data类型:`, typeof result.data);
+                        if (Array.isArray(result.data)) {
+                            console.log(`📦 [解析] result.data是数组，长度:`, result.data.length);
+                        }
+                    }
 
-                await prisma.videoTask.update({
-                    where: { id: task.id },
-                    data: { status: 'PROCESSING', promptId: promptId }
-                });
+                    imageUrl = null;
+
+                    // 尝试多种数据格式
+                    if (result.data && result.data.url) {
+                        // 格式1: { data: { url: "..." } }
+                        imageUrl = result.data.url;
+                        console.log(`✓ 使用格式1: data.url`);
+                    } else if (result.data && Array.isArray(result.data) && result.data[0] && result.data[0].url) {
+                        // 格式2: { data: [{ url: "..." }] }
+                        imageUrl = result.data[0].url;
+                        console.log(`✓ 使用格式2: data[0].url`);
+                    } else if (result.url) {
+                        // 格式3: { url: "..." }
+                        imageUrl = result.url;
+                        console.log(`✓ 使用格式3: url`);
+                    }
+
+                    if (imageUrl) {
+                        const localUrl = await downloadFileToLocal(imageUrl, `doubao_${Date.now()}.png`, 'output');
+                        console.log(`✅ [豆包] 图片已保存: ${localUrl}`);
+
+                        await prisma.videoTask.update({
+                            where: { id: task.id },
+                            data: {
+                                status: 'COMPLETED',
+                                resultUrl: localUrl,
+                                videoUrl: localUrl,
+                                translatedPrompt: prompt
+                            }
+                        });
+                    } else {
+                        console.error(`❌ [解析失败] 无法从返回数据中提取图片URL`);
+                        console.error(`完整数据:`, JSON.stringify(result, null, 2));
+                        throw new Error('豆包API返回的数据格式不正确');
+                    }
+
+                } else {
+                    // === ComfyUI模式（原有逻辑） ===
+                    console.log('🎨 [ComfyUI模式] 调用ComfyUI API...');
+
+                    // 1. 上传参考图
+                    const cloudName = await uploadImageToComfy(refImage.path, refImage.originalname);
+
+                    // 2. 视觉分析 (提取参考图特征)
+                    const refFeatures = await analyzeImageFeatures(refImage.path);
+
+                    // 3. 生成分镜提示词 (结合用户指令 + 参考图特征)
+                    const scenePrompt = await generateScenePrompt(prompt, refFeatures);
+
+                    await prisma.videoTask.update({
+                        where: { id: task.id },
+                        data: { translatedPrompt: scenePrompt }
+                    });
+
+                    // 4. 触发 Kontext 工作流
+                    const promptId = await triggerImg2Img(scenePrompt, ratio || '9:16', cloudName);
+
+                    await prisma.videoTask.update({
+                        where: { id: task.id },
+                        data: { status: 'PROCESSING', promptId: promptId }
+                    });
+                }
 
                 // 清理
-                if (fs.existsSync(refImage.path)) fs.unlinkSync(refImage.path);
+                if (refImage?.path && fs.existsSync(refImage.path)) fs.unlinkSync(refImage.path);
                 if (req.files?.imageFace?.[0]?.path && fs.existsSync(req.files.imageFace[0].path)) {
                     fs.unlinkSync(req.files.imageFace[0].path);
                 }
 
             } catch (err) {
-                console.error(`❌ [Kontext] 失败:`, err);
+                console.error(`❌ [${model.toUpperCase()}] 失败:`, err);
                 await prisma.videoTask.update({
                     where: { id: task.id },
                     data: { status: 'FAILED' }
                 });
                 // 清理临时文件
-                if (fs.existsSync(refImage.path)) fs.unlinkSync(refImage.path);
+                if (refImage?.path && fs.existsSync(refImage.path)) fs.unlinkSync(refImage.path);
+                if (multiImages && multiImages.length > 0) {
+                    multiImages.forEach(img => {
+                        if (fs.existsSync(img.path)) fs.unlinkSync(img.path);
+                    });
+                }
                 if (req.files?.imageFace?.[0]?.path && fs.existsSync(req.files.imageFace[0].path)) {
                     fs.unlinkSync(req.files.imageFace[0].path);
                 }
@@ -1311,18 +1816,24 @@ app.post('/api/generate/img2img', upload.fields([
 });
 
 // 生成任务接口 (原有的图生视频)
-app.post('/api/generate', upload.single('image'), async (req, res) => {
+app.post('/api/generate', upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'imageEnd', maxCount: 1 }
+]), async (req, res) => {
     try {
         // 调试信息
         console.log('📋 Request body:', req.body);
-        console.log('📁 Uploaded file:', req.file);
+        console.log('📁 Uploaded files:', req.files);
         
         // 从 body 获取参数
-        const { prompt, resolution, duration } = req.body;
-        const file = req.file;
-        if (!file) return res.status(400).json({ error: "请上传图片" });
+        const { prompt, ratio, duration, promptSegments } = req.body;
+        const imageFile = req.files?.image?.[0];  // 起始图（必需）
+        const imageEndFile = req.files?.imageEnd?.[0];  // 结束图（可选，用于首尾帧模式）
 
-        console.log(`\n🆕 收到新任务: ${prompt}, 画质: ${resolution}, 时长: ${duration}s`);
+        if (!imageFile) return res.status(400).json({ error: "请上传起始图片" });
+
+        const isDualImageMode = !!imageEndFile;  // 是否为双图模式
+        console.log(`\n🆕 收到新任务: ${prompt}, 比例: ${ratio}, 时长: ${duration}s, 模式: ${isDualImageMode ? '首尾帧（双图）' : '单图'}`);
 
         const task = await prisma.videoTask.create({
             data: { userPrompt: prompt || "动态视频", style: 'anime', status: 'PENDING' }
@@ -1334,27 +1845,72 @@ app.post('/api/generate', upload.single('image'), async (req, res) => {
         (async () => {
             try {
                 // A. 上传图片到 ComfyUI
-                const cloudFileName = await uploadImageToComfy(file.path, file.originalname);
-                
-                // B. 视觉分析 (已增强兼容性)
-                const staticDesc = await analyzeImageFeatures(file.path);
-                
-                // C. 提示词融合
-                const finalPrompt = await translatePrompt(prompt || "natural movement", staticDesc, 'anime');
-                
-                await prisma.videoTask.update({ where: { id: task.id }, data: { translatedPrompt: finalPrompt } });
+                const startImageName = await uploadImageToComfy(imageFile.path, imageFile.originalname);
+                let endImageName = startImageName;  // 单图模式下，结束图使用同一起始图
 
-                // D. 触发 ComfyUI
-                const promptId = await triggerComfyUI(finalPrompt, cloudFileName, resolution, duration);
-                
-                await prisma.videoTask.update({ where: { id: task.id }, data: { status: 'PROCESSING', promptId: promptId } });
+                // B. 如果是双图模式，上传结束图
+                if (isDualImageMode) {
+                    endImageName = await uploadImageToComfy(imageEndFile.path, imageEndFile.originalname);
+                    console.log(`📸 [双图模式] 已上传起始图: ${startImageName}`);
+                    console.log(`📸 [双图模式] 已上传结束图: ${endImageName}`);
+                } else {
+                    console.log(`📸 [单图模式] 已上传图片: ${startImageName}`);
+                }
+
+                // C. 根据时长选择不同的工作流
+                console.log(`🎯 [开始触发] 根据时长 ${duration}s 选择工作流...`);
+
+                if (duration === '10' || duration === '20') {
+                    // 长视频模式：使用 SVI 2.0 工作流
+                    console.log(`🎯 [长视频模式] 触发 triggerComfyUI...`);
+                    const result = await triggerComfyUI(
+                        prompt,
+                        startImageName,
+                        "576p", // resolutionKey 不再使用，改用 ratio
+                        duration,
+                        promptSegments,
+                        ratio
+                    );
+                    console.log(`✅ [任务提交] ComfyUI promptId: ${result}`);
+                    await prisma.videoTask.update({
+                        where: { id: task.id },
+                        data: {
+                            status: 'PROCESSING',
+                            promptId: result
+                        }
+                    });
+                    console.log(`✅ [数据库更新] 任务状态: PROCESSING, promptId: ${result}`);
+                } else {
+                    // 标准视频模式：使用 DaSiWa 8.1 双路径系统
+                    console.log(`🎯 [标准视频模式] 触发 DaSiWa 8.1 双路径系统...`);
+                    const result = await triggerComfyUINew(
+                        startImageName,
+                        endImageName,
+                        prompt,
+                        ratio,
+                        duration
+                    );
+
+                    console.log(`✅ [任务提交] ComfyUI promptId: ${result.prompt_id}, 模式: ${result.mode}`);
+                    await prisma.videoTask.update({
+                        where: { id: task.id },
+                        data: {
+                            status: 'PROCESSING',
+                            promptId: result.prompt_id,
+                            translatedPrompt: `MODE:${result.mode}|TARGET:${result.targetOutputNode}`
+                        }
+                    });
+                    console.log(`✅ [数据库更新] 任务状态: PROCESSING, 模式: ${result.mode}, 目标节点: ${result.targetOutputNode}`);
+                }
 
             } catch (err) {
                 console.error("❌ 任务失败:", err);
                 await prisma.videoTask.update({ where: { id: task.id }, data: { status: 'FAILED' } });
             } finally {
                 // 清理上传的临时文件
-                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+                if (imageFile?.path && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+                if (imageEndFile?.path && fs.existsSync(imageEndFile.path)) fs.unlinkSync(imageEndFile.path);
+                console.log("✅ [清理] 已删除临时上传文件");
             }
         })();
     } catch (error) {
@@ -1376,44 +1932,118 @@ app.get('/api/status/:id', async (req, res) => {
                 const historyData = await historyRes.json();
 
                 if (historyData[task.promptId]) {
-                    console.log("🏁 任务完成，正在解析...");
-                    const outputs = historyData[task.promptId].outputs;
+                    console.log("🏁 检查任务状态...");
+                    const taskStatus = historyData[task.promptId].status;
 
-                    let filename = null;
-                    let subfolder = "";
-                    let type = "output";
+                    // 检查是否执行失败
+                    if (taskStatus.status_str === 'error' || taskStatus.completed === false) {
+                        console.error("❌ ComfyUI 任务执行失败:", taskStatus);
 
-                    // 遍历寻找结果文件（图片或视频）
-                    for (const nodeId in outputs) {
-                        const nodeOutput = outputs[nodeId];
+                        // 输出详细错误信息
+                        const messages = historyData[task.promptId].messages || [];
+                        for (const msg of messages) {
+                            if (msg[0] === 'execution_error') {
+                                console.error("❌ [执行错误详情]", JSON.stringify(msg[1], null, 2));
+                            }
+                        }
 
-                        // 1. 先尝试找 images (文生图/图生图的结果)
-                        if (nodeOutput.images && nodeOutput.images.length > 0) {
-                            filename = nodeOutput.images[0].filename;
-                            subfolder = nodeOutput.images[0].subfolder;
-                            type = nodeOutput.images[0].type;
-                            console.log(`🖼️ 发现图片结果: ${filename}`);
-                            break;
-                        }
-                        // 2. 再尝试找 videos (图生视频的结果)
-                        else if (nodeOutput.videos && nodeOutput.videos.length > 0) {
-                            filename = nodeOutput.videos[0].filename;
-                            subfolder = nodeOutput.videos[0].subfolder;
-                            type = nodeOutput.videos[0].type;
-                            console.log(`🎬 发现视频结果: ${filename}`);
-                            break;
-                        }
-                        // 3. 再尝试找 gifs
-                        else if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
-                            filename = nodeOutput.gifs[0].filename;
-                            subfolder = nodeOutput.gifs[0].subfolder;
-                            type = nodeOutput.gifs[0].type;
-                            console.log(`🎬 发现GIF结果: ${filename}`);
-                            break;
-                        }
+                        await prisma.videoTask.update({
+                            where: { id: task.id },
+                            data: { status: 'FAILED' }
+                        });
+
+                        return res.json({ status: 'FAILED', error: 'ComfyUI 执行失败' });
                     }
 
-                    if (filename) {
+                    // 检查是否执行完成
+                    if (taskStatus.completed) {
+                        console.log("✅ 任务完成，正在解析...");
+                        const outputs = historyData[task.promptId].outputs;
+
+                        // ========================================
+                        // 声明变量（在 if-else 外部，确保作用域正确）
+                        // ========================================
+                        let filename = null;
+                        let subfolder = "";
+                        let type = "output";
+
+                        // ========================================
+                        // 根据任务类型处理输出
+                        // ========================================
+                        if (task.type === 'IMG2IMG' || task.type === 'TXT2IMG') {
+                            // === 文生图任务（IMG2IMG 或 TXT2IMG）：查找图片输出 ===
+                            console.log(`🔍 [文生图调试-任务类型:${task.type}] outputs中的节点:`, Object.keys(outputs));
+                            // 遍历所有输出节点，查找图片
+                            for (const nodeId in outputs) {
+                                const nodeOutput = outputs[nodeId];
+                                console.log(`🔍 [文生图调试] 节点${nodeId}输出:`, Object.keys(nodeOutput || {}));
+                                if (nodeOutput && nodeOutput.images && nodeOutput.images.length > 0) {
+                                    const imageData = nodeOutput.images[0];
+                                    filename = imageData.filename;
+                                    subfolder = imageData.subfolder || "";
+                                    type = imageData.type || "output";
+                                    console.log(`🖼️ [文生图-${task.type}] 从节点${nodeId}抓取到图片: ${filename}`);
+                                    break;
+                                }
+                            }
+
+                            if (!filename) {
+                                console.log(`⏳ [文生图-${task.type}] 未找到图片，继续等待...`);
+                                return res.json({ status: 'PROCESSING' });
+                            }
+                        } else {
+                            // === 图生视频任务（IMG2VID）：查找视频输出 ===
+                            // 🎯 双路径输出节点判断（根据任务模式）
+                            let targetOutputNode = "125"; // 默认双图模式
+                            let taskMode = "DUAL";
+                            if (task.translatedPrompt && task.translatedPrompt.includes('MODE:')) {
+                                const modeMatch = task.translatedPrompt.match(/MODE:(SINGLE|DUAL)\|TARGET:(\d+)/);
+                                if (modeMatch) {
+                                    taskMode = modeMatch[1];
+                                    targetOutputNode = modeMatch[2];
+                                }
+                            }
+                            console.log(`🎯 [图生视频-目标节点] 根据模式决定抓取节点: ${targetOutputNode} (${taskMode})`);
+
+                            const nodeOutput = outputs[targetOutputNode];
+                            if (nodeOutput) {
+                                console.log(`🎬 [节点${targetOutputNode}检查] 检查输出类型:`, Object.keys(nodeOutput));
+
+                                // 🏆 核心兼容性修复：VHS 插件可能会把 mp4 放在 gifs 分类下
+                                if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
+                                    const videoData = nodeOutput.gifs[0];
+                                    filename = videoData.filename;
+                                    subfolder = videoData.subfolder || "";
+                                    type = videoData.type || "output";
+                                    console.log(`🎬 [图生视频] 成功从 [gifs] 分类抓取到视频: ${filename}`);
+                                } else if (nodeOutput.videos && nodeOutput.videos.length > 0) {
+                                    const videoData = nodeOutput.videos[0];
+                                    filename = videoData.filename;
+                                    subfolder = videoData.subfolder || "";
+                                    type = videoData.type || "output";
+                                    console.log(`🎬 [图生视频] 成功从 [videos] 分类抓取到视频: ${filename}`);
+                                } else if (nodeOutput.images && nodeOutput.images.length > 0) {
+                                    // 节点只有图片输出，说明视频还没生成完成
+                                    console.log(`⏳ [图生视频] 节点${targetOutputNode}仅输出图片，视频合成中...`);
+                                    console.log(`🔄 [继续轮询] 等待节点${targetOutputNode}输出视频...`);
+                                    return res.json({ status: 'PROCESSING' });
+                                } else {
+                                    console.log(`⏳ [图生视频] 节点${targetOutputNode}尚无输出，等待...`);
+                                    return res.json({ status: 'PROCESSING' });
+                                }
+                            } else {
+                                console.warn(`⚠️ [图生视频] 节点${targetOutputNode}不存在 outputs 中`);
+                                // 如果节点不存在，继续轮询等待
+                                return res.json({ status: 'PROCESSING' });
+                            }
+
+                            // 只有找到视频文件才继续处理
+                            if (!filename) {
+                                console.log(`⏳ [图生视频] 未找到视频，继续等待...`);
+                                return res.json({ status: 'PROCESSING' });
+                            }
+                        }
+
                         const baseUrl = process.env.COMFY_API_URL.replace(/\/$/, "");
                         const params = new URLSearchParams();
                         params.append("filename", filename);
@@ -1445,6 +2075,7 @@ app.get('/api/status/:id', async (req, res) => {
                     }
                 }
             } catch (e) {
+                console.log(`⏳ [等待中] ComfyUI 还在处理，继续轮询... Error: ${e.message}`);
                 // ComfyUI 还没返回结果，继续等待
             }
         }
@@ -1453,6 +2084,137 @@ app.get('/api/status/:id', async (req, res) => {
         res.status(500).json({error: e.message});
     }
 });
+
+// 合并视频接口
+app.post('/api/merge-videos', async (req, res) => {
+    try {
+        const { videoUrls } = req.body;
+        
+        if (!videoUrls || !Array.isArray(videoUrls) || videoUrls.length === 0) {
+            return res.status(400).json({ error: '请提供要合并的视频URL列表' });
+        }
+
+        console.log(`\n🎬 [视频合并] 收到合并请求，视频数量: ${videoUrls.length}`);
+
+        // 创建合并目录
+        const mergeDir = path.join(process.cwd(), 'uploads', 'merged');
+        if (!fs.existsSync(mergeDir)) {
+            fs.mkdirSync(mergeDir, { recursive: true });
+        }
+
+        // 下载所有视频到本地
+        const localVideoPaths = [];
+        for (let i = 0; i < videoUrls.length; i++) {
+            const url = videoUrls[i];
+            const filename = `temp_${Date.now()}_${i}.mp4`;
+            const localPath = path.join(mergeDir, filename);
+            
+            console.log(`📥 下载视频 ${i + 1}/${videoUrls.length}: ${url}`);
+            
+            try {
+                const response = await fetch(url);
+                const fileStream = fs.createWriteStream(localPath);
+                await streamPipeline(response.body, fileStream);
+                localVideoPaths.push(localPath);
+            } catch (err) {
+                console.error(`❌ 下载视频 ${i + 1} 失败:`, err);
+                // 清理已下载的视频
+                localVideoPaths.forEach(p => {
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                });
+                return res.status(500).json({ error: `下载视频 ${i + 1} 失败` });
+            }
+        }
+
+        console.log('✅ 所有视频下载完成，开始合并...');
+
+        // 创建临时文件列表
+        const listFile = path.join(mergeDir, `list_${Date.now()}.txt`);
+        const fileListContent = localVideoPaths.map(p => `file '${p.replace(/\\/g, '/')}'`).join('\n');
+        fs.writeFileSync(listFile, fileListContent);
+
+        // 输出文件路径
+        const outputFile = path.join(mergeDir, `merged_${Date.now()}.mp4`);
+
+        console.log('📋 视频列表文件:', fileListContent);
+
+        // 使用 fluent-ffmpeg 合并视频
+        try {
+            await new Promise((resolve, reject) => {
+                ffmpeg()
+                    .input(listFile)
+                    .inputOptions([
+                        '-f', 'concat',
+                        '-safe', '0'
+                    ])
+                    .outputOptions([
+                        '-c', 'copy',
+                        '-y'
+                    ])
+                    .output(outputFile)
+                    .on('start', (commandLine) => {
+                        console.log('🚀 FFmpeg 命令:', commandLine);
+                    })
+                    .on('progress', (progress) => {
+                        console.log(`⏳ 合并进度: ${progress.percent ? progress.percent.toFixed(1) + '%' : '进行中...'}`);
+                    })
+                    .on('end', () => {
+                        console.log('✅ 视频合并成功!');
+                        resolve();
+                    })
+                    .on('error', (err) => {
+                        console.error('❌ FFmpeg 合并失败:', err.message);
+                        reject(err);
+                    })
+                    .run();
+            });
+
+            // 清理临时文件
+            try {
+                fs.unlinkSync(listFile);
+                localVideoPaths.forEach(p => {
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                });
+                console.log('✅ 临时文件已清理');
+            } catch (cleanupErr) {
+                console.error('⚠️ 清理临时文件失败:', cleanupErr);
+            }
+
+            // 生成可访问的URL
+            const mergeUrl = `http://localhost:3000/uploads/merged/${path.basename(outputFile)}`;
+            
+            console.log('🎉 合并完成，输出URL:', mergeUrl);
+            
+            return res.json({ 
+                success: true, 
+                mergeUrl,
+                message: '视频合并成功'
+            });
+
+        } catch (ffmpegError) {
+            console.error('❌ FFmpeg 执行失败:', ffmpegError);
+            
+            // 清理临时文件
+            try {
+                fs.unlinkSync(listFile);
+                localVideoPaths.forEach(p => {
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                });
+            } catch (cleanupErr) {
+                console.error('清理临时文件失败:', cleanupErr);
+            }
+            
+            return res.status(500).json({ error: '视频合并失败: ' + ffmpegError.message });
+        }
+
+    } catch (error) {
+        console.error('❌ 视频合并失败:', error);
+        res.status(500).json({ error: error.message || '视频合并失败' });
+    }
+});
+
+// 静态文件服务 - 合并后的视频
+app.use('/uploads/merged', express.static(path.join(process.cwd(), 'uploads', 'merged')));
 
 // 修改密码
 app.post('/api/auth/change-password', async (req, res) => {
@@ -1513,12 +2275,23 @@ app.post('/api/auth/change-password', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
+// 设置服务器超时时间（30分钟，用于长时间视频生成）
+const server = app.listen(PORT, () => {
+    console.log(`🚀 服务已启动: http://localhost:${PORT}`);
+    console.log(`🎤 TTS功能已配置，请确保在.env文件中填写Minimax API信息`);
+});
+
+// 设置请求超时为30分钟（冷启动可能需要很长时间）
+server.setTimeout(30 * 60 * 1000);
+
+// 设置Keep-Alive超时
+server.on('connection', (socket) => {
+    socket.setTimeout(30 * 60 * 1000);
+});
+
 // 启动服务器前先初始化数据库
 initializeDatabase().then(() => {
-    app.listen(PORT, () => {
-        console.log(`🚀 服务已启动: http://localhost:${PORT}`);
-        console.log(`🎤 TTS功能已配置，请确保在.env文件中填写Minimax API信息`);
-    });
+    console.log(`✅ 数据库初始化完成`);
 }).catch(error => {
     console.error('❌ 服务器启动失败:', error);
     process.exit(1);

@@ -25,7 +25,7 @@
               :rows="5"
               placeholder="✨ 描述你的梦境... (例如：赛博朋克少女，银色双马尾，坐在悬浮的霓虹王座上，雨夜背景)"
               resize="none"
-              maxlength="500"
+              maxlength="2000"
               show-word-limit
             />
           </div>

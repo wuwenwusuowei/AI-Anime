@@ -13,7 +13,7 @@
       <!-- 左侧：操作台 -->
       <div class="control-panel">
 
-        <!-- 1. 单图上传区 (Kontext工作流) -->
+        <!-- 1. 单图上传区 (Kontext工作流/豆包单图) -->
         <div class="panel-section">
           <div class="section-label">
             <el-icon><Files /></el-icon> 素材上传
@@ -45,6 +45,47 @@
           </div>
         </div>
 
+        <!-- 1.5 豆包多图模式 (仅在选择豆包模型时显示) -->
+        <div class="panel-section" v-if="form.model === 'doubao'">
+          <div class="section-label">
+            <el-icon><Picture /></el-icon> 多图模式设置
+          </div>
+          <div class="toggle-row">
+            <span>启用多图参考</span>
+            <el-switch v-model="form.multiImageMode" />
+          </div>
+
+          <!-- 多图上传区 -->
+          <div v-if="form.multiImageMode" class="multi-upload-area">
+            <div class="multi-images-grid">
+              <div
+                v-for="(img, index) in multiPreviewUrls"
+                :key="index"
+                class="multi-image-item"
+              >
+                <img :src="img.url" class="multi-img" />
+                <div class="multi-index">{{ index + 1 }}</div>
+                <button class="multi-delete" @click="removeMultiImage(index)">×</button>
+              </div>
+              <div class="multi-add-btn" @click="triggerMultiUpload">
+                <el-icon><Plus /></el-icon>
+                <span>添加图片</span>
+              </div>
+            </div>
+            <input
+              type="file"
+              ref="multiFileInput"
+              @change="handleMultiFileChange"
+              accept="image/*"
+              multiple
+              hidden
+            >
+          </div>
+          <p v-if="form.multiImageMode && multiPreviewUrls.length === 0" class="hint-text">
+            💡 提示：添加多张参考图，AI 将根据图片关系生成新图（例如：图1的服装换为图2的服装）
+          </p>
+        </div>
+
         <!-- 2. 动作描述 -->
         <div class="panel-section">
           <div class="section-label">
@@ -57,9 +98,32 @@
               :rows="4"
               placeholder="✨ 想要她做什么动作？(例如：坐在王座上喝茶，战斗姿态，在雨中奔跑...)"
               resize="none"
-              maxlength="500"
+              maxlength="2000"
               show-word-limit
             />
+          </div>
+        </div>
+
+        <!-- 3. 模型选择 -->
+        <div class="panel-section">
+          <div class="section-label">
+            <el-icon><MagicStick /></el-icon> 选择生成模型
+          </div>
+          <div class="model-grid">
+            <div
+              v-for="m in modelOptions"
+              :key="m.value"
+              class="model-card"
+              :class="{ active: form.model === m.value }"
+              @click="form.model = m.value"
+            >
+              <div class="model-icon">{{ m.icon }}</div>
+              <div class="model-info">
+                <div class="model-name">{{ m.label }}</div>
+                <div class="model-desc">{{ m.desc }}</div>
+              </div>
+              <div v-if="form.model === m.value" class="model-badge">已选择</div>
+            </div>
           </div>
         </div>
 
@@ -152,13 +216,15 @@ import { ref, reactive, onMounted, watch, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Picture, MagicStick, Clock, SuccessFilled, Loading, Download, Refresh, Delete,
-  User, Avatar, EditPen, FullScreen, Files, Warning
+  User, Avatar, EditPen, FullScreen, Files, Warning, Plus
 } from '@element-plus/icons-vue'
 
 // --- 数据定义 ---
 const form = reactive({
   prompt: '',
-  ratio: '9:16'
+  ratio: '9:16',
+  model: 'comfyui', // 默认使用ComfyUI
+  multiImageMode: false // 豆包多图模式
 })
 
 const ratioOptions = [
@@ -166,6 +232,11 @@ const ratioOptions = [
   { label: '1:1', value: '1:1', ratioVal: '1/1' },
   { label: '16:9', value: '16:9', ratioVal: '16/9' },
   { label: '3:4', value: '3:4', ratioVal: '3/4' },
+]
+
+const modelOptions = [
+  { label: 'ComfyUI', value: 'comfyui', icon: '🎨', desc: '本地部署, 稳定快速' },
+  { label: '豆包(即梦)', value: 'doubao', icon: '🌟', desc: '云端AI, 效果卓越' }
 ]
 
 // 状态
@@ -181,8 +252,18 @@ const file = ref<File | null>(null)
 const previewUrl = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 
+// 多图相关（豆包多图模式）
+const multiFiles = ref<File[]>([])
+const multiPreviewUrls = ref<Array<{ file: File, url: string }>>([])
+const multiFileInput = ref<HTMLInputElement | null>(null)
+
 // 计算属性：是否准备好生成
 const isReady = computed(() => {
+  if (form.model === 'doubao' && form.multiImageMode) {
+    // 豆包多图模式：需要多张图片或单张图片 + 提示词
+    return (multiPreviewUrls.value.length > 0 || file.value) && form.prompt
+  }
+  // 单图模式
   return file.value && form.prompt
 })
 
@@ -195,6 +276,7 @@ const loadState = () => {
       const state = JSON.parse(saved)
       form.prompt = state.prompt || ''
       form.ratio = state.ratio || '9:16'
+      form.model = state.model || 'comfyui' // 恢复模型选择
 
       // 恢复之前的结果（只要 resultUrl 不为空）
       if (state.resultUrl) {
@@ -220,6 +302,7 @@ const saveState = () => {
   const state = {
     prompt: form.prompt,
     ratio: form.ratio,
+    model: form.model, // 保存模型选择
     status: status.value,
     // 如果当前有结果就用当前的，否则保留之前的结果
     resultUrl: resultUrl.value || previousState.resultUrl || ''
@@ -253,6 +336,39 @@ const clearImage = () => {
   if (fileInput.value) fileInput.value.value = ''
 }
 
+// 多图上传逻辑
+const triggerMultiUpload = () => multiFileInput.value?.click()
+
+const handleMultiFileChange = (e: Event) => {
+  const uploadedFiles = (e.target as HTMLInputElement).files
+  if (!uploadedFiles) return
+
+  for (const uploadedFile of Array.from(uploadedFiles)) {
+    if (!uploadedFile.type.startsWith('image/')) continue
+    if (uploadedFile.size > 10 * 1024 * 1024) {
+      ElMessage.error(`图片 ${uploadedFile.name} 不能超过10MB`)
+      continue
+    }
+
+    const url = URL.createObjectURL(uploadedFile)
+    multiPreviewUrls.value.push({ file: uploadedFile, url })
+    multiFiles.value.push(uploadedFile)
+  }
+
+  if (multiFileInput.value) multiFileInput.value.value = ''
+}
+
+const removeMultiImage = (index: number) => {
+  multiPreviewUrls.value.splice(index, 1)
+  multiFiles.value.splice(index, 1)
+}
+
+const clearMultiImages = () => {
+  multiFiles.value = []
+  multiPreviewUrls.value = []
+  if (multiFileInput.value) multiFileInput.value.value = ''
+}
+
 // 生成逻辑
 const handleGenerate = async () => {
   if (!isReady.value) return
@@ -266,12 +382,32 @@ const handleGenerate = async () => {
     const formData = new FormData()
     formData.append('prompt', form.prompt)
     formData.append('ratio', form.ratio)
-    formData.append('imageBody', file.value!) // 只上传单图
+    formData.append('model', form.model) // 传递模型选择
+    formData.append('multiImageMode', String(form.multiImageMode)) // 多图模式标志
+
+    if (form.model === 'doubao' && form.multiImageMode) {
+      // 豆包多图模式：合并单图区域和多图区域的图片
+      if (file.value) {
+        formData.append('images', file.value) // 添加单图区域的图片
+      }
+      multiFiles.value.forEach(f => {
+        formData.append('images', f) // 添加多图区域的图片
+      })
+    } else {
+      // 单图模式：上传单张图片
+      formData.append('imageBody', file.value!)
+    }
+
+    // 创建30分钟的超时控制器（冷启动可能需要很长时间）
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000)
 
     const response = await fetch('http://localhost:3000/api/generate/img2img', {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: controller.signal
     })
+    clearTimeout(timeoutId)
     const data = await response.json()
 
     if (data.success) {
@@ -281,7 +417,14 @@ const handleGenerate = async () => {
       throw new Error(data.error || '提交失败')
     }
   } catch (err: any) {
-    error.value = err.message
+    console.error('❌ [生成失败] 错误详情:', err)
+
+    // 处理超时错误
+    if (err.name === 'AbortError') {
+      error.value = '请求超时，请稍后重试或检查网络连接'
+    } else {
+      error.value = err.message || '生成失败，请检查网络连接'
+    }
     loading.value = false
     status.value = 'FAILED'
   }
@@ -315,8 +458,11 @@ const handleRegenerate = () => handleGenerate()
 const handleClearAll = () => {
   localStorage.removeItem('img2img_state')
   form.prompt = ''
+  form.model = 'comfyui' // 重置模型选择
+  form.multiImageMode = false // 重置多图模式
   resultUrl.value = ''
   clearImage()
+  clearMultiImages()
   error.value = ''
   taskId.value = null
   status.value = ''
@@ -551,7 +697,7 @@ $green: #6BCB77;
     font-size: 14px;
     box-shadow: none;
     transition: all 0.2s;
-    
+
     &:focus {
       background: white;
       box-shadow: 4px 4px 0 $pink;
@@ -559,11 +705,199 @@ $green: #6BCB77;
   }
 }
 
+/* 多图模式设置 */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #F5F5F5;
+  border-radius: 12px;
+  border: 2px solid #E0E0E0;
+
+  span {
+    font-weight: bold;
+    font-size: 14px;
+    color: $dark;
+  }
+}
+
+.multi-upload-area {
+  margin-top: 16px;
+}
+
+.multi-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.multi-image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border: 2px solid $dark;
+  border-radius: 8px;
+  overflow: hidden;
+
+  .multi-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .multi-index {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: $dark;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .multi-delete {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: $pink;
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+}
+
+.multi-add-btn {
+  aspect-ratio: 1;
+  border: 2px dashed $blue;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  background: #F0F9FF;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #E1F5FE;
+    transform: scale(1.02);
+  }
+
+  .el-icon {
+    font-size: 24px;
+    color: $blue;
+  }
+
+  span {
+    font-size: 12px;
+    font-weight: bold;
+    color: $blue;
+  }
+}
+
+.hint-text {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.5;
+  padding: 10px;
+  background: #FFF3E0;
+  border-radius: 8px;
+  border-left: 3px solid #FFB300;
+}
+
 /* 画幅选择 */
 .ratio-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
+}
+
+/* 模型选择 */
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.model-card {
+  position: relative;
+  border: 2px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+
+  .model-icon {
+    font-size: 32px;
+  }
+
+  .model-info {
+    flex: 1;
+
+    .model-name {
+      font-size: 14px;
+      font-weight: bold;
+      color: $dark;
+      margin-bottom: 4px;
+    }
+
+    .model-desc {
+      font-size: 11px;
+      color: #666;
+    }
+  }
+
+  .model-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: $green;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+  }
+
+  &.active {
+    border-color: $dark;
+    background: linear-gradient(135deg, #FFF9E1 0%, #FFE0B2 100%);
+    box-shadow: 3px 3px 0 $dark;
+
+    .model-name {
+      color: $dark;
+    }
+  }
+
+  &:hover:not(.active) {
+    border-color: $blue;
+    background: rgba(77, 150, 255, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+  }
 }
 
 .ratio-btn {
@@ -784,5 +1118,6 @@ $green: #6BCB77;
   .upload-grid { flex-direction: column; }
   .plus-sign { transform: rotate(90deg); margin: 5px 0; }
   .ratio-grid { grid-template-columns: repeat(4, 1fr); }
+  .model-grid { grid-template-columns: 1fr; }
 }
 </style>

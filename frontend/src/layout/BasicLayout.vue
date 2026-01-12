@@ -306,7 +306,8 @@ $purple: #9B5DE5;
 /* --- Main Content --- */
 .pop-main {
   padding: 10px 24px 24px; /* 顶部留少一点，因为 Header 是悬浮的 */
-  overflow-y: auto;
+  overflow-y: auto; /* 允许滚动，确保页面内容可以滚动 */
+  height: calc(100vh - 80px); /* 减去 header 高度，确保滚动条正确计算 */
   
   /* 滚动条美化 */
   &::-webkit-scrollbar { width: 8px; }

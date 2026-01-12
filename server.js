@@ -105,26 +105,23 @@ const ASPECT_RATIOS = {
 };
 
 // ========================================
-// DaSiWa 8.1 双路径系统节点 ID 定义
+// DaSiWa 8.1 拆分版节点 ID 定义（对应独立 JSON 文件）
 // ========================================
 const DASIWAN_NODES = {
-    // 首尾帧模式（双图）节点 ID
+    // 首尾帧模式（双图）节点 ID - 对应 双图生成视频.json
     DUAL_START_IMAGE: "211",       // 起始图加载
     DUAL_END_IMAGE: "209",         // 结束图加载
     DUAL_POSITIVE_PROMPT: "136",   // 正面提示词
-    DUAL_NEGATIVE_PROMPT: "128",   // 负面提示词
     DUAL_RESOLUTION_VALUE: "300",  // 画质缩放值（长边：1024=576p, 1280=720p）
     DUAL_DURATION_VALUE: "301",    // 视频时长（81=5秒, 49=3秒）
-    DUAL_VIDEO_GEN: "139",         // 视频生成节点（WanFirstLastFrameToVideo）
     DUAL_FINAL_OUTPUT: "125",      // 最终视频输出节点（VHS_VideoCombine）
-    
-    // 纯单图模式（PainterI2V）节点 ID
-    SINGLE_START_IMAGE: "297",       // 起始图加载
-    SINGLE_POSITIVE_PROMPT: "287",   // 正面提示词
-    SINGLE_RESOLUTION_VALUE: "298",  // 画质缩放值（长边：1024=576p, 1280=720p）
-    SINGLE_DURATION_VALUE: "299",    // 视频时长（81=5秒, 49=3秒）
-    SINGLE_VIDEO_GEN: "293",         // 视频生成节点（PainterI2V - 无首尾锁定）
-    SINGLE_FINAL_OUTPUT: "269"      // 最终视频输出节点（VHS_VideoCombine）
+
+    // 纯单图模式节点 ID - 对应 单图生成视频.json
+    SINGLE_START_IMAGE: "54",       // 起始图加载
+    SINGLE_POSITIVE_PROMPT: "53",   // 正面提示词
+    SINGLE_RESOLUTION_VALUE: "42",  // 画质缩放值（长边：1024=576p, 1280=720p）
+    SINGLE_DURATION_VALUE: "43",    // 视频时长（81=5秒, 49=3秒）
+    SINGLE_FINAL_OUTPUT: "34"        // 最终视频输出节点（VHS_VideoCombine）
 };
 
 // --- 风格配置表 (基于用户指定文件) ---
@@ -851,17 +848,18 @@ async function triggerComfyUI(positivePrompt, cloudImageName, resolutionKey = "5
 }
 
 // ========================================
-// DaSiWa 8.1 双路径系统触发函数
+// DaSiWa 8.1 拆分版触发函数
 // ========================================
 async function triggerComfyUINew(startImageName, endImageName, prompt, ratio = "16:9", durationKey = "3") {
-    // 使用完整的 DaSiWa 8.1 工作流文件（双路径系统）
-    const workflowPath = path.join(__dirname, 'DaSiWa_81_API.json');
+    // 根据是否存在 imageEnd 判定加载哪个文件
+    const isDual = !!endImageName && startImageName !== endImageName;
+    const workflowFile = isDual ? '双图生成视频.json' : '单图生成视频.json';
+    const workflowPath = path.join(__dirname, workflowFile);
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 
-    const isDualImageMode = startImageName !== endImageName;
-    const modeName = isDualImageMode ? '首尾帧（双图）' : '纯单图';
-    console.log(`🎬 [双路径系统] 模式: ${modeName}`);
-    console.log(`🎬 [工作流] DaSiWa 8.1 (完整版)`);
+    const modeName = isDual ? '首尾帧（双图）' : '纯单图';
+    console.log(`🎬 [DaSiWa 8.1 拆分版] 模式: ${modeName}`);
+    console.log(`🎬 [工作流] ${workflowFile}`);
 
     // ========================================
     // 通用配置：比例和帧数
@@ -871,107 +869,67 @@ async function triggerComfyUINew(startImageName, endImageName, prompt, ratio = "
     console.log(`📐 [比例] ${ratio}: ${ratioConfig.description} (${ratioConfig.width}x${ratioConfig.height})`);
     console.log(`⏱️ [时长] ${targetFrames}帧 (${durationKey}s)`);
 
-    if (isDualImageMode) {
+    if (isDual) {
         // ========================================
-        // 路径A：首尾帧模式（双图）
+        // 路径A：首尾帧模式（双图）- 使用 DaSiWa_81_Dual.json
         // ========================================
-        console.log(`🚀 [路径A] 首尾帧模式 - 使用节点 139 (WanFirstLastFrameToVideo)`);
+        console.log(`🚀 [路径A] 首尾帧模式 - 填充双图节点`);
 
-        // 设置提示词（节点136）
-        if (workflow[DASIWAN_NODES.DUAL_POSITIVE_PROMPT]) {
-            workflow[DASIWAN_NODES.DUAL_POSITIVE_PROMPT].inputs.text = prompt;
-            console.log(`✅ [提示词] 节点${DASIWAN_NODES.DUAL_POSITIVE_PROMPT}: ${prompt.substring(0, 50)}...`);
-        }
-
-        // 设置画质缩放（节点300）
-        if (workflow[DASIWAN_NODES.DUAL_RESOLUTION_VALUE]) {
-            workflow[DASIWAN_NODES.DUAL_RESOLUTION_VALUE].inputs.value = ratioConfig.longest;
-            console.log(`✅ [画质缩放] 节点${DASIWAN_NODES.DUAL_RESOLUTION_VALUE}: ${ratioConfig.longest}px (长边)`);
-        }
-
-        // 设置视频时长（节点301）
-        if (workflow[DASIWAN_NODES.DUAL_DURATION_VALUE]) {
-            workflow[DASIWAN_NODES.DUAL_DURATION_VALUE].inputs.value = targetFrames;
-            console.log(`✅ [视频时长] 节点${DASIWAN_NODES.DUAL_DURATION_VALUE}: ${targetFrames}帧`);
-        }
-
-        // 设置起始图（节点211）
+        // 填充双图逻辑 ID
         if (workflow[DASIWAN_NODES.DUAL_START_IMAGE]) {
             workflow[DASIWAN_NODES.DUAL_START_IMAGE].inputs.image = startImageName;
             console.log(`✅ [起始图] 节点${DASIWAN_NODES.DUAL_START_IMAGE}: ${startImageName}`);
         }
 
-        // 设置结束图（节点209）
         if (workflow[DASIWAN_NODES.DUAL_END_IMAGE]) {
             workflow[DASIWAN_NODES.DUAL_END_IMAGE].inputs.image = endImageName;
             console.log(`✅ [结束图] 节点${DASIWAN_NODES.DUAL_END_IMAGE}: ${endImageName}`);
         }
 
-        // 视频生成节点（139）- 连接已自动完成
-        console.log(`✅ [视频生成] 节点${DASIWAN_NODES.DUAL_VIDEO_GEN}: 首尾帧计算，${targetFrames}帧`);
-
-        // 🔧 禁用单图路径的节点（mode: 4 = Never）
-        if (workflow[DASIWAN_NODES.SINGLE_VIDEO_GEN]) {
-            workflow[DASIWAN_NODES.SINGLE_VIDEO_GEN].mode = 4;
-            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.SINGLE_VIDEO_GEN} (PainterI2V)`);
+        if (workflow[DASIWAN_NODES.DUAL_POSITIVE_PROMPT]) {
+            workflow[DASIWAN_NODES.DUAL_POSITIVE_PROMPT].inputs.text = prompt;
+            console.log(`✅ [提示词] 节点${DASIWAN_NODES.DUAL_POSITIVE_PROMPT}: ${prompt.substring(0, 50)}...`);
         }
-        if (workflow[DASIWAN_NODES.SINGLE_FINAL_OUTPUT]) {
-            workflow[DASIWAN_NODES.SINGLE_FINAL_OUTPUT].mode = 4;
-            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.SINGLE_FINAL_OUTPUT} (单图输出)`);
+
+        if (workflow[DASIWAN_NODES.DUAL_RESOLUTION_VALUE]) {
+            workflow[DASIWAN_NODES.DUAL_RESOLUTION_VALUE].inputs.value = ratioConfig.longest;
+            console.log(`✅ [画质缩放] 节点${DASIWAN_NODES.DUAL_RESOLUTION_VALUE}: ${ratioConfig.longest}px (长边)`);
+        }
+
+        if (workflow[DASIWAN_NODES.DUAL_DURATION_VALUE]) {
+            workflow[DASIWAN_NODES.DUAL_DURATION_VALUE].inputs.value = targetFrames;
+            console.log(`✅ [视频时长] 节点${DASIWAN_NODES.DUAL_DURATION_VALUE}: ${targetFrames}帧`);
         }
 
     } else {
         // ========================================
-        // 路径B：纯单图模式（PainterI2V - 无首尾锁定）
+        // 路径B：纯单图模式 - 使用 DaSiWa_81_Single.json
         // ========================================
-        console.log(`🚀 [路径B] 纯单图模式 - 使用节点 293 (PainterI2V)`);
-        console.log(`🎯 [关键] PainterI2V 专为单图设计，无"首尾锁定"，AI可自由生成动作！`);
+        console.log(`🚀 [路径B] 纯单图模式 - 填充单图节点`);
 
-        // 设置提示词（节点287）
-        if (workflow[DASIWAN_NODES.SINGLE_POSITIVE_PROMPT]) {
-            workflow[DASIWAN_NODES.SINGLE_POSITIVE_PROMPT].inputs.text = prompt;
-            console.log(`✅ [提示词] 节点${DASIWAN_NODES.SINGLE_POSITIVE_PROMPT}: ${prompt.substring(0, 50)}...`);
-        }
-
-        // 设置画质缩放（节点298）
-        if (workflow[DASIWAN_NODES.SINGLE_RESOLUTION_VALUE]) {
-            workflow[DASIWAN_NODES.SINGLE_RESOLUTION_VALUE].inputs.value = ratioConfig.longest;
-            console.log(`✅ [画质缩放] 节点${DASIWAN_NODES.SINGLE_RESOLUTION_VALUE}: ${ratioConfig.longest}px (长边)`);
-        }
-
-        // 设置视频时长（节点299）
-        if (workflow[DASIWAN_NODES.SINGLE_DURATION_VALUE]) {
-            workflow[DASIWAN_NODES.SINGLE_DURATION_VALUE].inputs.value = targetFrames;
-            console.log(`✅ [视频时长] 节点${DASIWAN_NODES.SINGLE_DURATION_VALUE}: ${targetFrames}帧`);
-        }
-
-        // 设置起始图（节点297）
+        // 填充单图逻辑 ID
         if (workflow[DASIWAN_NODES.SINGLE_START_IMAGE]) {
             workflow[DASIWAN_NODES.SINGLE_START_IMAGE].inputs.image = startImageName;
             console.log(`✅ [起始图] 节点${DASIWAN_NODES.SINGLE_START_IMAGE}: ${startImageName}`);
         }
 
-        // 视频生成节点（293）- 自动运行
-        console.log(`✅ [视频生成] 节点${DASIWAN_NODES.SINGLE_VIDEO_GEN}: PainterI2V 自由生成，${targetFrames}帧`);
-
-        // 🔧 禁用双图路径的节点（mode: 4 = Never）
-        if (workflow[DASIWAN_NODES.DUAL_VIDEO_GEN]) {
-            workflow[DASIWAN_NODES.DUAL_VIDEO_GEN].mode = 4;
-            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.DUAL_VIDEO_GEN} (WanFirstLastFrameToVideo)`);
+        if (workflow[DASIWAN_NODES.SINGLE_POSITIVE_PROMPT]) {
+            workflow[DASIWAN_NODES.SINGLE_POSITIVE_PROMPT].inputs.text = prompt;
+            console.log(`✅ [提示词] 节点${DASIWAN_NODES.SINGLE_POSITIVE_PROMPT}: ${prompt.substring(0, 50)}...`);
         }
-        if (workflow[DASIWAN_NODES.DUAL_FINAL_OUTPUT]) {
-            workflow[DASIWAN_NODES.DUAL_FINAL_OUTPUT].mode = 4;
-            console.log(`🔧 [禁用] 节点${DASIWAN_NODES.DUAL_FINAL_OUTPUT} (双图输出)`);
+
+        if (workflow[DASIWAN_NODES.SINGLE_RESOLUTION_VALUE]) {
+            workflow[DASIWAN_NODES.SINGLE_RESOLUTION_VALUE].inputs.value = ratioConfig.longest;
+            console.log(`✅ [画质缩放] 节点${DASIWAN_NODES.SINGLE_RESOLUTION_VALUE}: ${ratioConfig.longest}px (长边)`);
+        }
+
+        if (workflow[DASIWAN_NODES.SINGLE_DURATION_VALUE]) {
+            workflow[DASIWAN_NODES.SINGLE_DURATION_VALUE].inputs.value = targetFrames;
+            console.log(`✅ [视频时长] 节点${DASIWAN_NODES.SINGLE_DURATION_VALUE}: ${targetFrames}帧`);
         }
     }
 
-    // 随机种子（采样器节点115）
-    const randomSeed = Math.floor(Math.random() * 1000000000000);
-    if (workflow["115"]) {
-        workflow["115"].inputs.noise_seed = randomSeed;
-    }
-
-    console.log(`🚀 [触发] 发送任务... 模式: ${isDualImageMode ? 'DUAL' : 'SINGLE'}`);
+    console.log(`🚀 [触发] 发送任务... 模式: ${isDual ? 'DUAL' : 'SINGLE'}`);
 
     const response = await fetch(`${process.env.COMFY_API_URL}/prompt`, {
         method: 'POST',
@@ -985,12 +943,12 @@ async function triggerComfyUINew(startImageName, endImageName, prompt, ratio = "
         throw new Error(`ComfyUI Error: ${response.statusText} - ${errorText}`);
     }
     const data = await response.json();
-    
+
     // 返回模式和 prompt_id
     return {
         prompt_id: data.prompt_id,
-        mode: isDualImageMode ? 'DUAL' : 'SINGLE',
-        targetOutputNode: isDualImageMode ? DASIWAN_NODES.DUAL_FINAL_OUTPUT : DASIWAN_NODES.SINGLE_FINAL_OUTPUT
+        mode: isDual ? 'DUAL' : 'SINGLE',
+        targetOutputNode: isDual ? DASIWAN_NODES.DUAL_FINAL_OUTPUT : DASIWAN_NODES.SINGLE_FINAL_OUTPUT
     };
 }
 
@@ -1993,9 +1951,10 @@ app.get('/api/status/:id', async (req, res) => {
                             }
                         } else {
                             // === 图生视频任务（IMG2VID）：查找视频输出 ===
-                            // 🎯 双路径输出节点判断（根据任务模式）
-                            let targetOutputNode = "125"; // 默认双图模式
-                            let taskMode = "DUAL";
+                            // 🎯 判定目标输出 ID（根据任务模式）
+                            let targetOutputNode = null;
+                            let taskMode = null;
+
                             if (task.translatedPrompt && task.translatedPrompt.includes('MODE:')) {
                                 const modeMatch = task.translatedPrompt.match(/MODE:(SINGLE|DUAL)\|TARGET:(\d+)/);
                                 if (modeMatch) {
@@ -2003,6 +1962,13 @@ app.get('/api/status/:id', async (req, res) => {
                                     targetOutputNode = modeMatch[2];
                                 }
                             }
+
+                            // 如果没有找到模式信息，使用默认值（向后兼容）
+                            if (!targetOutputNode) {
+                                targetOutputNode = "125"; // 默认双图模式
+                                taskMode = "DUAL";
+                            }
+
                             console.log(`🎯 [图生视频-目标节点] 根据模式决定抓取节点: ${targetOutputNode} (${taskMode})`);
 
                             const nodeOutput = outputs[targetOutputNode];
@@ -2010,18 +1976,13 @@ app.get('/api/status/:id', async (req, res) => {
                                 console.log(`🎬 [节点${targetOutputNode}检查] 检查输出类型:`, Object.keys(nodeOutput));
 
                                 // 🏆 核心兼容性修复：VHS 插件可能会把 mp4 放在 gifs 分类下
-                                if (nodeOutput.gifs && nodeOutput.gifs.length > 0) {
-                                    const videoData = nodeOutput.gifs[0];
+                                const videoData = (nodeOutput.gifs && nodeOutput.gifs[0]) || (nodeOutput.videos && nodeOutput.videos[0]);
+
+                                if (videoData) {
                                     filename = videoData.filename;
                                     subfolder = videoData.subfolder || "";
                                     type = videoData.type || "output";
-                                    console.log(`🎬 [图生视频] 成功从 [gifs] 分类抓取到视频: ${filename}`);
-                                } else if (nodeOutput.videos && nodeOutput.videos.length > 0) {
-                                    const videoData = nodeOutput.videos[0];
-                                    filename = videoData.filename;
-                                    subfolder = videoData.subfolder || "";
-                                    type = videoData.type || "output";
-                                    console.log(`🎬 [图生视频] 成功从 [videos] 分类抓取到视频: ${filename}`);
+                                    console.log(`🎬 [图生视频] 成功从 [${nodeOutput.gifs ? 'gifs' : 'videos'}] 分类抓取到视频: ${filename}`);
                                 } else if (nodeOutput.images && nodeOutput.images.length > 0) {
                                     // 节点只有图片输出，说明视频还没生成完成
                                     console.log(`⏳ [图生视频] 节点${targetOutputNode}仅输出图片，视频合成中...`);
